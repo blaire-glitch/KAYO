@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Payment - KAYO{% endblock %}
+
+{% block content %}
+<div class="mb-4 mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item active">Make Payment</li>
+        </ol>
+    </nav>
+    <h2><i class="bi bi-wallet2 me-2"></i>Make Payment</h2>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people me-2"></i>Unpaid Delegates</h5>
+            </div>
+            <div class="card-body">
+                {% if unpaid_delegates %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Parish</th>
+                                <th>Fee</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for delegate in unpaid_delegates %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ delegate.name }}</td>
+                                <td>{{ delegate.parish }}</td>
+                                <td>KSh {{ delegate_fee | int }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-primary">
+                                <td colspan="3" class="text-end fw-bold">Total Amount:</td>
+                                <td class="fw-bold">KSh {{ total_amount | int }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No unpaid delegates.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if unpaid_delegates %}
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-phone me-2"></i>M-Pesa Payment</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Enter your M-Pesa phone number below. You will receive an STK push prompt on your phone to complete the payment.
+                </div>
+                
+                <form method="POST" action="{{ url_for('payments.initiate_payment') }}">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-4">
+                        <label class="form-label">{{ form.phone_number.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.phone_number(class="form-control form-control-lg", placeholder="e.g., 0712345678") }}
+                        <small class="text-muted">Enter the phone number registered with M-Pesa</small>
+                        {% for error in form.phone_number.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-credit-card me-2"></i>Pay KSh {{ total_amount | int }} via M-Pesa
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card bg-light mb-4">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle me-2"></i>Payment Summary</h6>
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Delegates:</span>
+                    <strong>{{ unpaid_delegates | length }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Fee per delegate:</span>
+                    <span>KSh {{ delegate_fee | int }}</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Total:</strong>
+                    <strong class="text-success">KSh {{ total_amount | int }}</strong>
+                </div>
+            </div>
+        </div>
+        
+        {% if recent_payments %}
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Payment Attempts</h6>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for payment in recent_payments %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">{{ payment.created_at.strftime('%d %b, %H:%M') }}</small><br>
+                        KSh {{ payment.amount | int }}
+                    </div>
+                    <span class="badge bg-{{ 'success' if payment.status == 'completed' else 'warning' if payment.status == 'pending' else 'danger' }}">
+                        {{ payment.status | capitalize }}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

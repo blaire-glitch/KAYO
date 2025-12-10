@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Register Delegate - KAYO{% endblock %}
+
+{% block content %}
+<div class="mb-4 mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item active">Register Delegate</li>
+        </ol>
+    </nav>
+    <h2><i class="bi bi-person-plus me-2"></i>Register New Delegate</h2>
+    <p class="text-muted">Fill in the delegate's details below. Registration fee: <strong>KSh 1,000</strong> per delegate.</p>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('delegates.register_delegate') }}">
+                    {{ form.hidden_tag() }}
+                    
+                    <h6 class="text-muted mb-3">Personal Information</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">{{ form.name.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.name(class="form-control", placeholder="Enter delegate's full name") }}
+                            {% for error in form.name.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.gender.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.gender(class="form-select") }}
+                            {% for error in form.gender.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.phone_number.label.text }}</label>
+                        {{ form.phone_number(class="form-control", placeholder="e.g., 0712345678") }}
+                        {% for error in form.phone_number.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6 class="text-muted mb-3">Church Details</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.local_church.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.local_church(class="form-control", placeholder="Enter local church name") }}
+                        {% for error in form.local_church.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.parish.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.parish(class="form-control", placeholder="Enter parish name") }}
+                            {% for error in form.parish.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.archdeaconry.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.archdeaconry(class="form-control", placeholder="Enter archdeaconry name") }}
+                            {% for error in form.archdeaconry.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('delegates.list_delegates') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>Back to List
+                        </a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle me-2"></i>Registration Info</h6>
+                <hr>
+                <p class="small mb-2"><strong>Fee per delegate:</strong> KSh 1,000</p>
+                <p class="small mb-2"><strong>Payment method:</strong> M-Pesa Paybill</p>
+                <p class="small mb-0 text-muted">
+                    You can register multiple delegates and pay for all of them at once.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

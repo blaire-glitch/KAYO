@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Status - KAYO{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center p-5">
+                {% if payment.status == 'pending' %}
+                <div class="spinner-border text-primary mb-4" role="status" style="width: 4rem; height: 4rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h3>Processing Payment</h3>
+                <p class="text-muted">Please check your phone and enter your M-Pesa PIN to complete the payment.</p>
+                <p class="text-muted small">Amount: <strong>KSh {{ payment.amount | int }}</strong></p>
+                
+                <div class="alert alert-info mt-4" id="status-message">
+                    <i class="bi bi-phone me-2"></i>
+                    Waiting for M-Pesa confirmation...
+                </div>
+                
+                {% elif payment.status == 'completed' %}
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+                <h3 class="mt-4">Payment Successful!</h3>
+                <p class="text-muted">Your payment has been received and confirmed.</p>
+                
+                <div class="alert alert-success mt-4">
+                    <strong>Amount:</strong> KSh {{ payment.amount | int }}<br>
+                    <strong>Receipt:</strong> {{ payment.mpesa_receipt_number or 'N/A' }}<br>
+                    <strong>Delegates:</strong> {{ payment.delegates_count }}
+                </div>
+                
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary mt-3">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+                
+                {% else %}
+                <i class="bi bi-x-circle-fill text-danger" style="font-size: 5rem;"></i>
+                <h3 class="mt-4">Payment Failed</h3>
+                <p class="text-muted">{{ payment.result_desc or 'The payment could not be processed.' }}</p>
+                
+                <a href="{{ url_for('payments.payment_page') }}" class="btn btn-primary mt-3">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Try Again
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if payment.status == 'pending' %}
+<script>
+    // Poll for payment status
+    let checkCount = 0;
+    const maxChecks = 60; // Check for 5 minutes max
+    
+    function checkPaymentStatus() {
+        if (checkCount >= maxChecks) {
+            document.getElementById('status-message').innerHTML = 
+                '<i class="bi bi-exclamation-triangle me-2"></i>Payment verification timeout. Please refresh the page or check your payment history.';
+            return;
+        }
+        
+        fetch('{{ url_for("payments.check_payment_status", payment_id=payment.id) }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'completed') {
+                    location.reload();
+                } else if (data.status === 'failed') {
+                    location.reload();
+                } else {
+                    checkCount++;
+                    setTimeout(checkPaymentStatus, 5000); // Check every 5 seconds
+                }
+            })
+            .catch(error => {
+                console.error('Error checking payment status:', error);
+                checkCount++;
+                setTimeout(checkPaymentStatus, 5000);
+            });
+    }
+    
+    // Start checking after 5 seconds
+    setTimeout(checkPaymentStatus, 5000);
+</script>
+{% endif %}
+{% endblock %}
