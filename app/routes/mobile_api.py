@@ -12,8 +12,16 @@ import secrets
 # Optional JWT import
 try:
     import jwt
-    HAS_JWT = True
-except ImportError:
+    # Verify it's PyJWT, not another jwt package
+    if hasattr(jwt, 'encode') and hasattr(jwt, 'decode'):
+        HAS_JWT = True
+    else:
+        HAS_JWT = False
+        jwt = None
+except ImportError as e:
+    HAS_JWT = False
+    jwt = None
+except Exception as e:
     HAS_JWT = False
     jwt = None
 
@@ -83,11 +91,19 @@ def token_required(f):
 @mobile_api_bp.route('/status', methods=['GET'])
 def api_status():
     """Check API status and availability"""
+    jwt_version = None
+    try:
+        import jwt as jwt_check
+        jwt_version = getattr(jwt_check, '__version__', 'unknown')
+    except:
+        pass
+    
     return jsonify({
         'success': True,
         'status': 'online',
         'version': '1.0.0',
         'jwt_available': HAS_JWT,
+        'jwt_version': jwt_version,
         'message': 'KAYO API is running' if HAS_JWT else 'API running but JWT not installed - install PyJWT on server'
     })
 
