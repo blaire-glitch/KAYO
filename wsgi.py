@@ -3,7 +3,7 @@ import sys
 import os
 
 # Add your project directory to the sys.path
-project_home = '/home/Monsieur/KAYO'
+project_home = '/home/Monsiuer/KAYO'
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
