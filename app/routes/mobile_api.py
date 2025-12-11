@@ -15,7 +15,7 @@ from app.models.user import User
 from app.models.delegate import Delegate
 from app.models.payment import Payment
 from app.models.event import Event, PricingTier
-from app.models.operations import CheckInRecord, EventSession
+from app.models.operations import CheckInRecord
 from app.church_data import CHURCH_DATA
 
 mobile_api_bp = Blueprint('mobile_api', __name__, url_prefix='/api/v1')
