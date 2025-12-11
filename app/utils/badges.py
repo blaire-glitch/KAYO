@@ -1,6 +1,15 @@
 import io
 import base64
-from PIL import Image, ImageDraw, ImageFont
+
+# Optional PIL import
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+    Image = None
+    ImageDraw = None
+    ImageFont = None
 
 # Optional qrcode import
 try:
