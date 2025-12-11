@@ -25,6 +25,12 @@ def create_app(config_class=Config):
     from app.routes.payments import payments_bp
     from app.routes.admin import admin_bp
     from app.routes.api import api_bp
+    from app.routes.events import events_bp
+    from app.routes.settings import settings_bp
+    from app.routes.analytics import analytics_bp
+    from app.routes.communications import communications_bp
+    from app.routes.badges import badges_bp
+    from app.routes.checkin import checkin_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -32,5 +38,11 @@ def create_app(config_class=Config):
     app.register_blueprint(payments_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(events_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(analytics_bp)
+    app.register_blueprint(communications_bp)
+    app.register_blueprint(badges_bp)
+    app.register_blueprint(checkin_bp)
 
     return app

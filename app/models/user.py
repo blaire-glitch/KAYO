@@ -12,26 +12,61 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     phone = db.Column(db.String(15), unique=True, nullable=True)
-    role = db.Column(db.String(20), nullable=False, default='chair')  # chair, youth_minister, admin
-    password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='chair')  # Legacy role field
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=True)  # New RBAC
+    password_hash = db.Column(db.String(256), nullable=True)  # Nullable for OAuth users
     local_church = db.Column(db.String(100), nullable=True)
     parish = db.Column(db.String(100), nullable=True)
     archdeaconry = db.Column(db.String(100), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
+    
+    # Google OAuth fields
+    google_id = db.Column(db.String(100), unique=True, nullable=True)
+    profile_picture = db.Column(db.String(500), nullable=True)
+    oauth_provider = db.Column(db.String(20), nullable=True)  # 'google', 'local', etc.
+    
+    # Multi-event support
+    current_event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=True)
     
     # Relationships
-    delegates = db.relationship('Delegate', backref='registered_by_user', lazy='dynamic')
+    delegates = db.relationship('Delegate', backref='registered_by_user', lazy='dynamic',
+                               foreign_keys='Delegate.registered_by')
     payments = db.relationship('Payment', backref='user', lazy='dynamic')
+    assigned_role = db.relationship('Role', backref='users', foreign_keys=[role_id])
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
+        if not self.password_hash:
+            return False  # OAuth users without password
         return check_password_hash(self.password_hash, password)
     
     def is_admin(self):
-        return self.role == 'admin'
+        return self.role == 'admin' or self.role == 'super_admin'
+    
+    def is_super_admin(self):
+        return self.role == 'super_admin'
+    
+    def has_permission(self, permission):
+        """Check if user has a specific permission via RBAC"""
+        # Super admins have all permissions
+        if self.role == 'super_admin' or self.role == 'admin':
+            return True
+        # Check role-based permissions
+        if self.assigned_role:
+            return self.assigned_role.has_permission(permission)
+        return False
+    
+    def get_current_event(self):
+        """Get user's current active event"""
+        from app.models.event import Event
+        if self.current_event_id:
+            return Event.query.get(self.current_event_id)
+        # Return first active event if none selected
+        return Event.query.filter_by(is_active=True).first()
     
     def get_unpaid_delegates_count(self):
         """Get count of delegates not yet paid for"""
@@ -45,6 +80,24 @@ class User(UserMixin, db.Model):
         """Calculate total amount due for unpaid delegates"""
         from flask import current_app
         return self.get_unpaid_delegates_count() * current_app.config['DELEGATE_FEE']
+    
+    def log_activity(self, action, resource_type, resource_id=None, description=None, 
+                    old_values=None, new_values=None):
+        """Log user activity"""
+        from flask import request
+        from app.models.audit import AuditLog
+        return AuditLog.log(
+            user=self,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            description=description,
+            old_values=old_values,
+            new_values=new_values,
+            ip_address=request.remote_addr if request else None,
+            user_agent=request.headers.get('User-Agent') if request else None,
+            event_id=self.current_event_id
+        )
     
     def __repr__(self):
         return f'<User {self.email}>'

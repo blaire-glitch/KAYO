@@ -12,6 +12,7 @@ class Delegate(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     ticket_number = db.Column(db.String(20), unique=True, nullable=False)
+    delegate_number = db.Column(db.Integer, nullable=True)  # Auto-assigned sequential number
     name = db.Column(db.String(100), nullable=False)
     local_church = db.Column(db.String(100), nullable=False)
     parish = db.Column(db.String(100), nullable=False)
@@ -21,6 +22,13 @@ class Delegate(db.Model):
     gender = db.Column(db.String(10), nullable=False)  # male, female
     category = db.Column(db.String(20), default='delegate')  # delegate, leader, speaker, vip
     
+    # Multi-event support
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=True)
+    pricing_tier_id = db.Column(db.Integer, db.ForeignKey('pricing_tiers.id'), nullable=True)
+    
+    # Custom field values (JSON)
+    custom_field_values = db.Column(db.Text, default='{}')
+    
     # Registration details
     registered_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -28,23 +36,57 @@ class Delegate(db.Model):
     # Payment status
     is_paid = db.Column(db.Boolean, default=False)
     payment_id = db.Column(db.Integer, db.ForeignKey('payments.id'), nullable=True)
+    amount_paid = db.Column(db.Float, default=0)
     
     # Check-in tracking
     checked_in = db.Column(db.Boolean, default=False)
     checked_in_at = db.Column(db.DateTime, nullable=True)
     
+    # Relationships
+    pricing_tier = db.relationship('PricingTier', backref='delegates')
+    check_in_records = db.relationship('CheckInRecord', backref='delegate', lazy='dynamic')
+    payment_reminders = db.relationship('PaymentReminder', backref='delegate', lazy='dynamic')
+    
     def __repr__(self):
         return f'<Delegate {self.name}>'
     
+    def get_custom_field_values(self):
+        """Parse custom field values JSON"""
+        import json
+        try:
+            return json.loads(self.custom_field_values) if self.custom_field_values else {}
+        except:
+            return {}
+    
+    def set_custom_field_values(self, values):
+        """Set custom field values as JSON"""
+        import json
+        self.custom_field_values = json.dumps(values)
+    
     @staticmethod
-    def generate_ticket_number():
+    def generate_ticket_number(event=None):
         """Generate a unique ticket number like KAYO-2025-XXXX"""
         year = datetime.utcnow().year
         # Get the count of delegates this year
-        count = Delegate.query.filter(
+        query = Delegate.query.filter(
             db.extract('year', Delegate.registered_at) == year
-        ).count() + 1
-        return f"KAYO-{year}-{count:04d}"
+        )
+        if event:
+            query = query.filter_by(event_id=event.id)
+        count = query.count() + 1
+        prefix = event.slug.upper() if event else 'KAYO'
+        return f"{prefix}-{year}-{count:04d}"
+    
+    @staticmethod
+    def get_next_delegate_number(event_id=None):
+        """Get next sequential delegate number"""
+        query = Delegate.query
+        if event_id:
+            query = query.filter_by(event_id=event_id)
+        max_num = db.session.query(db.func.max(Delegate.delegate_number)).filter(
+            Delegate.event_id == event_id if event_id else True
+        ).scalar()
+        return (max_num or 0) + 1
     
     def generate_qr_code(self):
         """Generate QR code for this delegate"""
@@ -61,7 +103,7 @@ class Delegate(db.Model):
         return base64.b64encode(buffer.getvalue()).decode()
     
     @staticmethod
-    def check_duplicate(phone_number=None, id_number=None, exclude_id=None):
+    def check_duplicate(phone_number=None, id_number=None, exclude_id=None, event_id=None):
         """Check for duplicate registrations"""
         duplicates = []
         

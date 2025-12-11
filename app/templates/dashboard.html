@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - KAYO{% endblock %}
+{% block title %}Dashboard - KAYO | ACK Diocese of Nambale{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 mt-3">
     <div>
         <h2><i class="bi bi-speedometer2 me-2"></i>Dashboard</h2>
-        <p class="text-muted mb-0">Welcome back, {{ current_user.name }}!</p>
+        <p class="text-muted mb-0">Welcome back, {{ current_user.name }}! <span class="text-primary">| KAYO - ACK Diocese of Nambale</span></p>
     </div>
     <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
         <i class="bi bi-person-plus me-2"></i>Register Delegate

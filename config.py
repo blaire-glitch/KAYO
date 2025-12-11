@@ -17,5 +17,9 @@ class Config:
     MPESA_CALLBACK_URL = os.environ.get('MPESA_CALLBACK_URL')
     MPESA_ENV = os.environ.get('MPESA_ENV', 'sandbox')  # 'sandbox' or 'production'
     
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+    
     # Delegate registration fee (in KSh)
     DELEGATE_FEE = 1000
