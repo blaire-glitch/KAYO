@@ -8,9 +8,14 @@
         <h2><i class="bi bi-people me-2"></i>My Delegates</h2>
         <p class="text-muted mb-0">{{ delegates.total }} delegate(s) registered</p>
     </div>
-    <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
-        <i class="bi bi-person-plus me-2"></i>Register Delegate
-    </a>
+    <div class="btn-group">
+        <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-2"></i>Register
+        </a>
+        <a href="{{ url_for('delegates.bulk_register') }}" class="btn btn-outline-primary">
+            <i class="bi bi-cloud-upload me-2"></i>Bulk Upload
+        </a>
+    </div>
 </div>
 
 <div class="card">
@@ -20,12 +25,10 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th>Ticket</th>
                         <th>Name</th>
-                        <th>Local Church</th>
-                        <th>Parish</th>
-                        <th>Archdeaconry</th>
-                        <th>Gender</th>
+                        <th>Church</th>
+                        <th>Category</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -33,12 +36,20 @@
                 <tbody>
                     {% for delegate in delegates.items %}
                     <tr>
-                        <td>{{ loop.index + (delegates.page - 1) * delegates.per_page }}</td>
-                        <td><strong>{{ delegate.name }}</strong></td>
-                        <td>{{ delegate.local_church }}</td>
-                        <td>{{ delegate.parish }}</td>
-                        <td>{{ delegate.archdeaconry }}</td>
-                        <td>{{ delegate.gender | capitalize }}</td>
+                        <td><code>{{ delegate.ticket_number }}</code></td>
+                        <td>
+                            <strong>{{ delegate.name }}</strong>
+                            <br><small class="text-muted">{{ delegate.gender | capitalize }}</small>
+                        </td>
+                        <td>
+                            {{ delegate.local_church }}
+                            <br><small class="text-muted">{{ delegate.archdeaconry }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if delegate.category == 'vip' else 'info' if delegate.category == 'speaker' else 'warning' if delegate.category == 'leader' else 'secondary' }}">
+                                {{ delegate.category|upper if delegate.category else 'DELEGATE' }}
+                            </span>
+                        </td>
                         <td>
                             {% if delegate.is_paid %}
                             <span class="badge badge-paid">Paid</span>
@@ -51,8 +62,11 @@
                                 <a href="{{ url_for('delegates.view_delegate', id=delegate.id) }}" class="btn btn-sm btn-outline-secondary" title="View">
                                     <i class="bi bi-eye"></i>
                                 </a>
+                                <a href="{{ url_for('delegates.view_ticket', id=delegate.id) }}" class="btn btn-sm btn-outline-primary" title="Ticket">
+                                    <i class="bi bi-ticket-perforated"></i>
+                                </a>
                                 {% if not delegate.is_paid %}
-                                <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-sm btn-outline-primary" title="Edit">
+                                <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-sm btn-outline-warning" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <form action="{{ url_for('delegates.delete_delegate', id=delegate.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this delegate?');">

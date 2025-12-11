@@ -1,12 +1,13 @@
 from functools import wraps
 from io import BytesIO
-from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, current_app
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, current_app, jsonify
 from flask_login import login_required, current_user
 from app import db
 from app.models.user import User
 from app.models.delegate import Delegate
 from app.models.payment import Payment
-from app.forms import AdminUserForm
+from app.forms import AdminUserForm, SearchForm, CheckInForm
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -31,6 +32,7 @@ def dashboard():
     total_delegates = Delegate.query.count()
     paid_delegates = Delegate.query.filter_by(is_paid=True).count()
     unpaid_delegates = total_delegates - paid_delegates
+    checked_in = Delegate.query.filter_by(checked_in=True).count()
     
     total_users = User.query.filter(User.role != 'admin').count()
     total_collected = Payment.get_total_collected()
@@ -43,6 +45,12 @@ def dashboard():
     
     # Get gender stats
     gender_stats = Delegate.get_gender_stats()
+    
+    # Get category stats
+    category_stats = Delegate.get_category_stats()
+    
+    # Get daily registration stats (last 30 days)
+    daily_stats = Delegate.get_daily_registration_stats(30)
     
     # Recent payments
     recent_payments = Payment.query.filter_by(
@@ -58,11 +66,14 @@ def dashboard():
         total_delegates=total_delegates,
         paid_delegates=paid_delegates,
         unpaid_delegates=unpaid_delegates,
+        checked_in=checked_in,
         total_users=total_users,
         total_collected=total_collected,
         archdeaconry_stats=archdeaconry_stats,
         parish_stats=parish_stats,
         gender_stats=gender_stats,
+        category_stats=category_stats,
+        daily_stats=daily_stats,
         recent_payments=recent_payments,
         recent_delegates=recent_delegates
     )
@@ -401,3 +412,110 @@ def export_delegates_pdf():
     except ImportError:
         flash('PDF export requires reportlab library.', 'danger')
         return redirect(url_for('admin.all_delegates'))
+
+
+@admin_bp.route('/check-in', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def check_in():
+    """Check-in delegates using ticket number or QR scan"""
+    form = CheckInForm()
+    delegate = None
+    
+    if form.validate_on_submit():
+        ticket_number = form.ticket_number.data.strip().upper()
+        delegate = Delegate.query.filter_by(ticket_number=ticket_number).first()
+        
+        if delegate:
+            if delegate.checked_in:
+                flash(f'{delegate.name} is already checked in!', 'warning')
+            else:
+                delegate.checked_in = True
+                delegate.checked_in_at = datetime.utcnow()
+                db.session.commit()
+                flash(f'{delegate.name} successfully checked in!', 'success')
+        else:
+            flash(f'No delegate found with ticket: {ticket_number}', 'danger')
+    
+    # Recent check-ins
+    recent_checkins = Delegate.query.filter_by(
+        checked_in=True
+    ).order_by(Delegate.checked_in_at.desc()).limit(20).all()
+    
+    # Stats
+    total_checked_in = Delegate.query.filter_by(checked_in=True).count()
+    total_delegates = Delegate.query.count()
+    
+    return render_template('admin/check_in.html', 
+        form=form, 
+        delegate=delegate,
+        recent_checkins=recent_checkins,
+        total_checked_in=total_checked_in,
+        total_delegates=total_delegates
+    )
+
+
+@admin_bp.route('/search')
+@login_required
+@admin_required
+def search():
+    """Smart search for delegates"""
+    form = SearchForm(request.args)
+    delegates = []
+    
+    query = request.args.get('query', '').strip()
+    archdeaconry = request.args.get('archdeaconry', '')
+    parish = request.args.get('parish', '')
+    gender = request.args.get('gender', '')
+    payment_status = request.args.get('payment_status', '')
+    category = request.args.get('category', '')
+    
+    if query or archdeaconry or parish or gender or payment_status or category:
+        q = Delegate.query
+        
+        if query:
+            search_term = f"%{query}%"
+            q = q.filter(
+                db.or_(
+                    Delegate.name.ilike(search_term),
+                    Delegate.phone_number.ilike(search_term),
+                    Delegate.id_number.ilike(search_term),
+                    Delegate.ticket_number.ilike(search_term),
+                    Delegate.local_church.ilike(search_term)
+                )
+            )
+        
+        if archdeaconry:
+            q = q.filter(Delegate.archdeaconry == archdeaconry)
+        if parish:
+            q = q.filter(Delegate.parish == parish)
+        if gender:
+            q = q.filter(Delegate.gender == gender)
+        if category:
+            q = q.filter(Delegate.category == category)
+        if payment_status == 'paid':
+            q = q.filter(Delegate.is_paid == True)
+        elif payment_status == 'unpaid':
+            q = q.filter(Delegate.is_paid == False)
+        
+        delegates = q.order_by(Delegate.name).limit(100).all()
+    
+    return render_template('admin/search.html', form=form, delegates=delegates)
+
+
+@admin_bp.route('/api/stats')
+@login_required
+@admin_required
+def api_stats():
+    """API endpoint for dashboard statistics"""
+    daily_stats = Delegate.get_daily_registration_stats(30)
+    
+    return jsonify({
+        'daily_registrations': [
+            {'date': str(stat.date), 'count': stat.count} 
+            for stat in daily_stats
+        ],
+        'total_delegates': Delegate.query.count(),
+        'paid_delegates': Delegate.query.filter_by(is_paid=True).count(),
+        'checked_in': Delegate.query.filter_by(checked_in=True).count()
+    })

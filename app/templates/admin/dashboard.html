@@ -8,19 +8,25 @@
         <h2><i class="bi bi-speedometer2 me-2"></i>Admin Dashboard</h2>
         <p class="text-muted mb-0">Overview of all registrations and payments</p>
     </div>
-    <div>
-        <a href="{{ url_for('admin.export_delegates_excel') }}" class="btn btn-outline-success me-2">
-            <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+    <div class="btn-group">
+        <a href="{{ url_for('admin.search') }}" class="btn btn-outline-primary">
+            <i class="bi bi-search me-1"></i>Search
+        </a>
+        <a href="{{ url_for('admin.check_in') }}" class="btn btn-outline-success">
+            <i class="bi bi-qr-code-scan me-1"></i>Check-In
+        </a>
+        <a href="{{ url_for('admin.export_delegates_excel') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark-excel me-1"></i>Excel
         </a>
         <a href="{{ url_for('admin.export_delegates_pdf') }}" class="btn btn-outline-danger">
-            <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+            <i class="bi bi-file-earmark-pdf me-1"></i>PDF
         </a>
     </div>
 </div>
 
 <!-- Stats Cards -->
 <div class="row mb-4">
-    <div class="col-md-3 mb-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card stat-card bg-primary text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -34,12 +40,12 @@
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card stat-card bg-success text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="stat-value">{{ paid_delegates }}</div>
-                    <div class="stat-label text-white-50">Paid Delegates</div>
+                    <div class="stat-label text-white-50">Paid</div>
                 </div>
                 <div class="stat-icon">
                     <i class="bi bi-check-circle"></i>
@@ -48,30 +54,44 @@
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
-        <div class="card stat-card bg-danger text-white">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card stat-card bg-info text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="stat-value">{{ unpaid_delegates }}</div>
-                    <div class="stat-label text-white-50">Unpaid Delegates</div>
+                    <div class="stat-value">{{ checked_in }}</div>
+                    <div class="stat-label text-white-50">Checked In</div>
                 </div>
                 <div class="stat-icon">
-                    <i class="bi bi-exclamation-circle"></i>
+                    <i class="bi bi-person-check"></i>
                 </div>
             </div>
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card stat-card bg-warning">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="stat-value">KSh {{ total_collected | int }}</div>
-                    <div class="stat-label">Total Collected</div>
+                    <div class="stat-value">KSh {{ "{:,.0f}".format(total_collected) }}</div>
+                    <div class="stat-label">Collected</div>
                 </div>
                 <div class="stat-icon">
                     <i class="bi bi-cash-stack"></i>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Registration Trend Chart -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Registration Trend (Last 30 Days)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="registrationChart" height="100"></canvas>
             </div>
         </div>
     </div>
@@ -237,4 +257,99 @@
         </div>
     </div>
 </div>
+
+<!-- Category Stats Row -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Delegates by Category</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Payment Status</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="paymentChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Registration Trend Chart
+const dailyData = {{ daily_stats | tojson if daily_stats else '[]' }};
+const labels = dailyData.map(d => d.date || d[0]);
+const counts = dailyData.map(d => d.count || d[1]);
+
+new Chart(document.getElementById('registrationChart'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Registrations',
+            data: counts,
+            borderColor: '#0d6efd',
+            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+            fill: true,
+            tension: 0.3
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+
+// Category Chart
+const categoryData = {{ category_stats | tojson if category_stats else '[]' }};
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: categoryData.map(d => (d.category || d[0] || 'Unknown').toUpperCase()),
+        datasets: [{
+            data: categoryData.map(d => d.count || d[1]),
+            backgroundColor: ['#6c757d', '#ffc107', '#17a2b8', '#28a745']
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+// Payment Status Chart
+new Chart(document.getElementById('paymentChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Paid', 'Unpaid'],
+        datasets: [{
+            data: [{{ paid_delegates }}, {{ unpaid_delegates }}],
+            backgroundColor: ['#28a745', '#ffc107']
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+</script>
 {% endblock %}

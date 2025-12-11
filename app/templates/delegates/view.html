@@ -17,10 +17,18 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-person me-2"></i>Delegate Details</h5>
-                <span class="badge {{ 'badge-paid' if delegate.is_paid else 'badge-unpaid' }}">
-                    {{ 'Paid' if delegate.is_paid else 'Unpaid' }}
-                </span>
+                <div>
+                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Delegate Details</h5>
+                    <small class="text-muted">Ticket: <strong>{{ delegate.ticket_number }}</strong></small>
+                </div>
+                <div>
+                    <span class="badge bg-{{ 'success' if delegate.category == 'vip' else 'info' if delegate.category == 'speaker' else 'warning' if delegate.category == 'leader' else 'secondary' }} me-1">
+                        {{ delegate.category|upper }}
+                    </span>
+                    <span class="badge {{ 'badge-paid' if delegate.is_paid else 'badge-unpaid' }}">
+                        {{ 'Paid' if delegate.is_paid else 'Unpaid' }}
+                    </span>
+                </div>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -40,8 +48,25 @@
                         <p class="fw-bold mb-0">{{ delegate.phone_number or 'Not provided' }}</p>
                     </div>
                     <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small">ID Number</label>
+                        <p class="fw-bold mb-0">{{ delegate.id_number or 'Not provided' }}</p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
                         <label class="form-label text-muted small">Registered On</label>
                         <p class="fw-bold mb-0">{{ delegate.registered_at.strftime('%d %B %Y, %H:%M') }}</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small">Check-In Status</label>
+                        <p class="fw-bold mb-0">
+                            {% if delegate.checked_in %}
+                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>Checked In ({{ delegate.checked_in_at.strftime('%d %b %H:%M') }})</span>
+                            {% else %}
+                            <span class="text-muted"><i class="bi bi-clock me-1"></i>Not Yet Checked In</span>
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
                 
@@ -73,10 +98,18 @@
                 {% endif %}
             </div>
             <div class="card-footer bg-white">
-                <div class="d-flex justify-content-between">
+                <div class="d-flex justify-content-between flex-wrap gap-2">
                     <a href="{{ url_for('delegates.list_delegates') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left me-2"></i>Back to List
                     </a>
+                    <div class="btn-group">
+                        <a href="{{ url_for('delegates.view_ticket', id=delegate.id) }}" class="btn btn-outline-primary">
+                            <i class="bi bi-ticket-perforated me-1"></i>Ticket
+                        </a>
+                        <a href="{{ url_for('delegates.print_badge', id=delegate.id) }}" class="btn btn-outline-info">
+                            <i class="bi bi-person-badge me-1"></i>Badge
+                        </a>
+                    </div>
                     <div>
                         {% if not delegate.is_paid %}
                         <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-primary">

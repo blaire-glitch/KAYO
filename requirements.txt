@@ -12,3 +12,5 @@ gunicorn==21.2.0
 # psycopg2-binary==2.9.9  # Uncomment for PostgreSQL
 openpyxl==3.1.2
 reportlab==4.0.7
+qrcode[pil]==7.4.2
+Pillow==10.1.0

@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, Response
 from flask_login import login_required, current_user
 from app import db
 from app.models.delegate import Delegate
-from app.forms import DelegateForm
+from app.forms import DelegateForm, BulkRegistrationForm, SearchForm
+import csv
+import io
 
 delegates_bp = Blueprint('delegates', __name__, url_prefix='/delegates')
 
@@ -19,19 +21,31 @@ def register_delegate():
         form.archdeaconry.data = current_user.archdeaconry or ''
     
     if form.validate_on_submit():
+        # Check for duplicates
+        duplicates = Delegate.check_duplicate(
+            phone_number=form.phone_number.data,
+            id_number=form.id_number.data
+        )
+        if duplicates:
+            for msg in duplicates:
+                flash(msg, 'warning')
+        
         delegate = Delegate(
+            ticket_number=Delegate.generate_ticket_number(),
             name=form.name.data,
             local_church=form.local_church.data,
             parish=form.parish.data,
             archdeaconry=form.archdeaconry.data,
             phone_number=form.phone_number.data or None,
+            id_number=form.id_number.data or None,
             gender=form.gender.data,
+            category=form.category.data,
             registered_by=current_user.id
         )
         db.session.add(delegate)
         db.session.commit()
-        flash(f'Delegate "{delegate.name}" registered successfully!', 'success')
-        return redirect(url_for('delegates.list_delegates'))
+        flash(f'Delegate "{delegate.name}" registered successfully! Ticket: {delegate.ticket_number}', 'success')
+        return redirect(url_for('delegates.view_delegate', id=delegate.id))
     
     return render_template('delegates/register.html', form=form)
 
@@ -82,12 +96,24 @@ def edit_delegate(id):
     form = DelegateForm(obj=delegate)
     
     if form.validate_on_submit():
+        # Check for duplicates (excluding current delegate)
+        duplicates = Delegate.check_duplicate(
+            phone_number=form.phone_number.data,
+            id_number=form.id_number.data,
+            exclude_id=delegate.id
+        )
+        if duplicates:
+            for msg in duplicates:
+                flash(msg, 'warning')
+        
         delegate.name = form.name.data
         delegate.local_church = form.local_church.data
         delegate.parish = form.parish.data
         delegate.archdeaconry = form.archdeaconry.data
         delegate.phone_number = form.phone_number.data or None
+        delegate.id_number = form.id_number.data or None
         delegate.gender = form.gender.data
+        delegate.category = form.category.data
         db.session.commit()
         flash('Delegate updated successfully!', 'success')
         return redirect(url_for('delegates.view_delegate', id=id))
@@ -115,3 +141,104 @@ def delete_delegate(id):
     db.session.commit()
     flash(f'Delegate "{name}" has been deleted.', 'success')
     return redirect(url_for('delegates.list_delegates'))
+
+
+@delegates_bp.route('/<int:id>/ticket')
+@login_required
+def view_ticket(id):
+    """View delegate ticket with QR code"""
+    delegate = Delegate.query.get_or_404(id)
+    
+    # Only allow viewing own delegates (unless admin)
+    if delegate.registered_by != current_user.id and not current_user.is_admin():
+        flash('You do not have permission to view this ticket.', 'danger')
+        return redirect(url_for('delegates.list_delegates'))
+    
+    qr_code = delegate.generate_qr_code()
+    return render_template('delegates/ticket.html', delegate=delegate, qr_code=qr_code)
+
+
+@delegates_bp.route('/<int:id>/badge')
+@login_required
+def print_badge(id):
+    """Print delegate badge"""
+    delegate = Delegate.query.get_or_404(id)
+    
+    # Only allow viewing own delegates (unless admin)
+    if delegate.registered_by != current_user.id and not current_user.is_admin():
+        flash('You do not have permission to print this badge.', 'danger')
+        return redirect(url_for('delegates.list_delegates'))
+    
+    qr_code = delegate.generate_qr_code()
+    return render_template('delegates/badge.html', delegate=delegate, qr_code=qr_code)
+
+
+@delegates_bp.route('/bulk', methods=['GET', 'POST'])
+@login_required
+def bulk_register():
+    """Bulk registration via CSV upload"""
+    form = BulkRegistrationForm()
+    
+    if form.validate_on_submit():
+        file = form.csv_file.data
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_reader = csv.DictReader(stream)
+        
+        registered = 0
+        errors = []
+        
+        for row in csv_reader:
+            try:
+                # Check for required fields
+                name = row.get('name', '').strip()
+                if not name:
+                    errors.append(f"Row {registered + 1}: Missing name")
+                    continue
+                
+                delegate = Delegate(
+                    ticket_number=Delegate.generate_ticket_number(),
+                    name=name,
+                    local_church=row.get('local_church', current_user.local_church or ''),
+                    parish=row.get('parish', current_user.parish or ''),
+                    archdeaconry=row.get('archdeaconry', current_user.archdeaconry or ''),
+                    phone_number=row.get('phone_number') or None,
+                    id_number=row.get('id_number') or None,
+                    gender=row.get('gender', 'male').lower(),
+                    category=row.get('category', 'delegate').lower(),
+                    registered_by=current_user.id
+                )
+                db.session.add(delegate)
+                registered += 1
+            except Exception as e:
+                errors.append(f"Row {registered + 1}: {str(e)}")
+        
+        db.session.commit()
+        
+        if registered > 0:
+            flash(f'Successfully registered {registered} delegates!', 'success')
+        if errors:
+            for error in errors[:5]:  # Show first 5 errors
+                flash(error, 'warning')
+            if len(errors) > 5:
+                flash(f'... and {len(errors) - 5} more errors', 'warning')
+        
+        return redirect(url_for('delegates.list_delegates'))
+    
+    return render_template('delegates/bulk.html', form=form)
+
+
+@delegates_bp.route('/bulk/template')
+@login_required
+def download_template():
+    """Download CSV template for bulk registration"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['name', 'phone_number', 'id_number', 'gender', 'category', 'local_church', 'parish', 'archdeaconry'])
+    writer.writerow(['John Doe', '0712345678', '12345678', 'male', 'delegate', 'St. Peters', 'Sample Parish', 'Sample Archdeaconry'])
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=delegate_template.csv'}
+    )
