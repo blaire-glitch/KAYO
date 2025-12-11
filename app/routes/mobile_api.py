@@ -79,28 +79,48 @@ def token_required(f):
     return decorated
 
 
+# ==================== STATUS ENDPOINT ====================
+@mobile_api_bp.route('/status', methods=['GET'])
+def api_status():
+    """Check API status and availability"""
+    return jsonify({
+        'success': True,
+        'status': 'online',
+        'version': '1.0.0',
+        'jwt_available': HAS_JWT,
+        'message': 'KAYO API is running' if HAS_JWT else 'API running but JWT not installed - install PyJWT on server'
+    })
+
+
 # ==================== AUTHENTICATION ENDPOINTS ====================
 @mobile_api_bp.route('/auth/login', methods=['POST'])
 def mobile_login():
     """Login endpoint for mobile app"""
+    # Check if JWT is available first
+    if not HAS_JWT:
+        return jsonify({
+            'success': False,
+            'error': 'Authentication service temporarily unavailable. Please try again later.'
+        }), 503
+    
     data = request.get_json()
     
     if not data:
-        return jsonify({'error': 'No data provided'}), 400
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
     
     email = data.get('email')
     password = data.get('password')
     
     if not email or not password:
-        return jsonify({'error': 'Email and password required'}), 400
+        return jsonify({'success': False, 'error': 'Email and password required'}), 400
     
     user = User.query.filter_by(email=email).first()
     
     if not user or not user.check_password(password):
-        return jsonify({'error': 'Invalid email or password'}), 401
+        return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
     
     if not user.is_active:
-        return jsonify({'error': 'Account is deactivated'}), 401
+        return jsonify({'success': False, 'error': 'Account is deactivated'}), 401
     
     # Update last login
     user.last_login = datetime.utcnow()
@@ -111,6 +131,7 @@ def mobile_login():
     
     return jsonify({
         'success': True,
+        'message': 'Login successful',
         'token': token,
         'user': {
             'id': user.id,
