@@ -6,14 +6,7 @@ import zipfile
 from app import db
 from app.models.delegate import Delegate
 from app.models.event import Event
-
-# Optional badge designer import
-try:
-    from app.utils.badges import BadgeDesigner
-    HAS_BADGE_DESIGNER = True
-except ImportError:
-    HAS_BADGE_DESIGNER = False
-    BadgeDesigner = None
+from app.utils.badges import BadgeDesigner
 
 badges_bp = Blueprint('badges', __name__, url_prefix='/badges')
 
@@ -34,10 +27,6 @@ def admin_required(f):
 @admin_required
 def index():
     """Badge designer dashboard"""
-    if not HAS_BADGE_DESIGNER:
-        flash('Badge designer is not available. Required packages (PIL) may not be installed.', 'warning')
-        return redirect(url_for('main.dashboard'))
-    
     templates = BadgeDesigner.get_available_templates()
     events = Event.query.filter_by(is_active=True).all()
     

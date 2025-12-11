@@ -4,6 +4,13 @@ from flask_login import LoginManager
 from flask_migrate import Migrate
 from config import Config
 
+# Optional CORS import for mobile API
+try:
+    from flask_cors import CORS
+    HAS_CORS = True
+except ImportError:
+    HAS_CORS = False
+
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
@@ -18,6 +25,10 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    
+    # Enable CORS for mobile API endpoints
+    if HAS_CORS:
+        CORS(app, resources={r"/api/v1/*": {"origins": "*"}})
 
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
@@ -31,6 +42,7 @@ def create_app(config_class=Config):
     from app.routes.communications import communications_bp
     from app.routes.badges import badges_bp
     from app.routes.checkin import checkin_bp
+    from app.routes.mobile_api import mobile_api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -44,5 +56,6 @@ def create_app(config_class=Config):
     app.register_blueprint(communications_bp)
     app.register_blueprint(badges_bp)
     app.register_blueprint(checkin_bp)
+    app.register_blueprint(mobile_api_bp)
 
     return app

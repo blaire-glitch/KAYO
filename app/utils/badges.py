@@ -1,22 +1,7 @@
 import io
 import base64
-
-# Optional PIL import
-try:
-    from PIL import Image, ImageDraw, ImageFont
-    HAS_PIL = True
-except ImportError:
-    HAS_PIL = False
-    Image = None
-    ImageDraw = None
-    ImageFont = None
-
-# Optional qrcode import
-try:
-    import qrcode
-    HAS_QRCODE = True
-except ImportError:
-    HAS_QRCODE = False
+from PIL import Image, ImageDraw, ImageFont
+import qrcode
 
 
 class BadgeDesigner:
@@ -249,13 +234,6 @@ class BadgeDesigner:
     
     def _generate_qr(self, delegate):
         """Generate QR code for delegate"""
-        if not HAS_QRCODE:
-            # Return a placeholder image if qrcode not available
-            placeholder = Image.new('RGB', (100, 100), '#CCCCCC')
-            draw = ImageDraw.Draw(placeholder)
-            draw.text((20, 40), "QR", fill='#666666')
-            return placeholder
-        
         qr_data = f"KAYO-{delegate.ticket_number or delegate.id}"
         
         qr = qrcode.QRCode(
