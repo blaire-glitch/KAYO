@@ -7,8 +7,15 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_login import login_user, current_user
 from datetime import datetime, timedelta
 from functools import wraps
-import jwt
 import secrets
+
+# Optional JWT import
+try:
+    import jwt
+    HAS_JWT = True
+except ImportError:
+    HAS_JWT = False
+    jwt = None
 
 from app import db
 from app.models.user import User
@@ -25,6 +32,8 @@ mobile_api_bp = Blueprint('mobile_api', __name__, url_prefix='/api/v1')
 
 def generate_token(user_id, expires_hours=24*7):
     """Generate JWT token for mobile authentication"""
+    if not HAS_JWT:
+        return None
     payload = {
         'user_id': user_id,
         'exp': datetime.utcnow() + timedelta(hours=expires_hours),
@@ -38,6 +47,9 @@ def token_required(f):
     """Decorator to require valid JWT token"""
     @wraps(f)
     def decorated(*args, **kwargs):
+        if not HAS_JWT:
+            return jsonify({'error': 'JWT authentication not available'}), 503
+        
         token = None
         
         # Check Authorization header
@@ -68,7 +80,6 @@ def token_required(f):
 
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
-
 @mobile_api_bp.route('/auth/login', methods=['POST'])
 def mobile_login():
     """Login endpoint for mobile app"""
