@@ -1,8 +1,15 @@
 from datetime import datetime
 import uuid
-import qrcode
 import io
 import base64
+
+# Optional qrcode import - may not be available on all platforms
+try:
+    import qrcode
+    HAS_QRCODE = True
+except ImportError:
+    HAS_QRCODE = False
+
 from app import db
 
 
@@ -90,6 +97,10 @@ class Delegate(db.Model):
     
     def generate_qr_code(self):
         """Generate QR code for this delegate"""
+        if not HAS_QRCODE:
+            # Return a placeholder if qrcode module not available
+            return None
+        
         qr_data = f"KAYO|{self.ticket_number}|{self.name}|{self.phone_number or 'N/A'}"
         qr = qrcode.QRCode(version=1, box_size=10, border=4)
         qr.add_data(qr_data)
