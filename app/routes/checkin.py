@@ -539,9 +539,13 @@ def session_attendance():
             'last_arrival': last.strftime('%I:%M %p') if last else 'N/A'
         })
     
+    # Get total registered delegates for the event
+    total_registered = Delegate.query.filter_by(event_id=event_id).count() if event_id else Delegate.query.count()
+    
     return render_template('checkin/sessions.html',
         events=events,
         selected_event_id=event_id,
         selected_date=filter_date,
-        sessions=sessions
+        sessions=sessions,
+        total_registered=total_registered
     )

@@ -97,7 +97,7 @@ class BadgeDesigner:
         
         # Diocese subtitle
         subtitle_font = self._get_font('details', 18)
-        draw.text((30, 65), "ACK Diocese of Nambale", fill='rgba(255,255,255,0.8)', font=subtitle_font)
+        draw.text((30, 65), "ACK Diocese of Nambale", fill=(255, 255, 255, 204), font=subtitle_font)
         
         # Delegate name (large)
         name_font = self._get_font('name', 60)

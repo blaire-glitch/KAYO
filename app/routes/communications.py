@@ -407,8 +407,8 @@ def whatsapp_messages():
     events = Event.query.filter_by(is_active=True).all()
     delegate_counts = {
         'all': Delegate.query.count(),
-        'paid': Delegate.query.filter_by(payment_status='paid').count(),
-        'unpaid': Delegate.query.filter(Delegate.payment_status.in_(['pending', 'partial'])).count(),
+        'paid': Delegate.query.filter_by(is_paid=True).count(),
+        'unpaid': Delegate.query.filter_by(is_paid=False).count(),
         'checked_in': Delegate.query.filter_by(checked_in=True).count(),
         'not_checked_in': Delegate.query.filter_by(checked_in=False).count()
     }

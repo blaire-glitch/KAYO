@@ -160,17 +160,17 @@
 
     <!-- Session Cards -->
     <div class="row mb-4">
-        {% for session_name, data in session_data.items() %}
+        {% for session in sessions %}
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card session-card shadow-sm h-100">
                 <div class="session-header">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h5 class="mb-0">{{ session_name or 'General Check-in' }}</h5>
-                            <small class="opacity-75">{{ selected_date.strftime('%B %d, %Y') }}</small>
+                            <h5 class="mb-0">{{ session.name or 'General Check-in' }}</h5>
+                            <small class="opacity-75">{{ selected_date.strftime('%B %d, %Y') if selected_date else '' }}</small>
                         </div>
                         <div class="text-end">
-                            <div class="session-count">{{ data.count }}</div>
+                            <div class="session-count">{{ session.count }}</div>
                             <small>Attendees</small>
                         </div>
                     </div>
@@ -179,10 +179,10 @@
                     <div class="mb-3">
                         <div class="d-flex justify-content-between text-muted small mb-1">
                             <span>Attendance</span>
-                            <span>{{ data.count }} / {{ total_registered }}</span>
+                            <span>{{ session.count }} / {{ total_registered|default(0) }}</span>
                         </div>
                         <div class="progress" style="height: 8px;">
-                            {% set percentage = (data.count / total_registered * 100) if total_registered > 0 else 0 %}
+                            {% set percentage = (session.count / total_registered * 100) if total_registered|default(0) > 0 else 0 %}
                             <div class="progress-bar bg-success" style="width: {{ percentage }}%"></div>
                         </div>
                     </div>
@@ -190,85 +190,19 @@
                     <div class="mb-2">
                         <small class="text-muted">
                             <i class="far fa-clock me-1"></i>
-                            First: {{ data.first_checkin.strftime('%I:%M %p') if data.first_checkin else 'N/A' }}
-                            {% if data.last_checkin %}
-                            • Last: {{ data.last_checkin.strftime('%I:%M %p') }}
+                            First: {{ session.first_arrival }}
+                            {% if session.last_arrival %}
+                            • Last: {{ session.last_arrival }}
                             {% endif %}
                         </small>
                     </div>
                     
                     <hr class="my-2">
                     
-                    <h6 class="small text-muted mb-2">Attendees:</h6>
-                    <div class="attendee-list" style="max-height: 150px; overflow-y: auto;">
-                        {% for attendee in data.attendees[:20] %}
-                        <span class="attendee-chip {{ 'paid' if attendee.payment_status == 'paid' else 'unpaid' }}">
-                            <i class="fas fa-user me-1 text-muted"></i>
-                            {{ attendee.name }}
-                        </span>
-                        {% endfor %}
-                        {% if data.attendees|length > 20 %}
-                        <span class="attendee-chip">
-                            <i class="fas fa-ellipsis-h me-1"></i>
-                            +{{ data.attendees|length - 20 }} more
-                        </span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-footer bg-light">
-                    <button class="btn btn-sm btn-outline-primary w-100" 
-                            data-bs-toggle="modal" data-bs-target="#sessionModal{{ loop.index }}">
-                        <i class="fas fa-list me-1"></i>View Full List
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Session Detail Modal -->
-        <div class="modal fade" id="sessionModal{{ loop.index }}" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">
-                            <i class="fas fa-users me-2"></i>{{ session_name or 'General Check-in' }} - Full Attendance
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Name</th>
-                                        <th>Ticket</th>
-                                        <th>Parish</th>
-                                        <th>Check-in Time</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for attendee in data.attendees %}
-                                    <tr>
-                                        <td>{{ loop.index }}</td>
-                                        <td>{{ attendee.name }}</td>
-                                        <td><code>{{ attendee.ticket_number }}</code></td>
-                                        <td>{{ attendee.parish or '-' }}</td>
-                                        <td>{{ attendee.arrival_time.strftime('%I:%M %p') }}</td>
-                                        <td>
-                                            <span class="badge bg-{{ 'success' if attendee.payment_status == 'paid' else 'warning' }}">
-                                                {{ attendee.payment_status|upper }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <span class="me-auto text-muted">Total: {{ data.count }} attendees</span>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <div class="text-center py-2">
+                        <a href="{{ url_for('checkin.qr_scanner') }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-qrcode me-1"></i>Go to Scanner
+                        </a>
                     </div>
                 </div>
             </div>
@@ -288,37 +222,6 @@
         </div>
         {% endfor %}
     </div>
-
-    <!-- Timeline View -->
-    {% if arrivals_timeline %}
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Arrival Timeline</h5>
-                </div>
-                <div class="card-body">
-                    <div class="timeline" style="max-height: 400px; overflow-y: auto;">
-                        {% for item in arrivals_timeline %}
-                        <div class="timeline-item">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <strong>{{ item.name }}</strong>
-                                    {% if item.session %}
-                                    <span class="badge bg-info ms-2">{{ item.session }}</span>
-                                    {% endif %}
-                                </div>
-                                <span class="text-muted small">{{ item.arrival_time.strftime('%I:%M %p') }}</span>
-                            </div>
-                            <small class="text-muted">{{ item.parish or 'No parish' }}</small>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 <!-- Print Styles -->
