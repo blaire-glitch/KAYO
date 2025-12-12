@@ -587,13 +587,25 @@ def api_get_event(event_id):
 @mobile_api_bp.route('/delegates', methods=['GET'])
 @token_required
 def get_delegates(user):
-    """Get delegates registered by current user"""
+    """
+    Get delegates based on user's role and scope:
+    - super_admin/admin/finance/data_entry: All delegates
+    - youth_minister: Delegates from their archdeaconry
+    - chairperson: Delegates from their parish
+    """
     event_id = request.args.get('event_id', type=int)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     search = request.args.get('search', '')
+    view_all = request.args.get('view_all', 'false').lower() == 'true'  # For viewing all (stats only)
     
-    query = Delegate.query.filter_by(registered_by=user.id)
+    # Start with base query
+    query = Delegate.query
+    
+    # Apply scope filter based on user role
+    scope_filter = get_user_delegate_scope_filter(user)
+    if scope_filter is not None and not view_all:
+        query = query.filter(scope_filter)
     
     if event_id:
         query = query.filter_by(event_id=event_id)
@@ -611,7 +623,19 @@ def get_delegates(user):
         page=page, per_page=per_page, error_out=False
     )
     
+    # Determine user's scope for the response
+    user_scope = {
+        'role': user.role,
+        'scope_type': 'all' if user.role in FULL_ACCESS_ROLES else 
+                      'archdeaconry' if user.role in ['youth_minister', 'minister'] else 
+                      'parish' if user.role in ['chair', 'chairperson'] else 'own',
+        'scope_value': user.archdeaconry if user.role in ['youth_minister', 'minister'] else 
+                       user.parish if user.role in ['chair', 'chairperson'] else None
+    }
+    
     return jsonify({
+        'success': True,
+        'user_scope': user_scope,
         'delegates': [{
             'id': d.id,
             'ticket_number': d.ticket_number,
@@ -626,7 +650,8 @@ def get_delegates(user):
             'is_paid': d.is_paid,
             'amount_paid': d.amount_paid,
             'checked_in': d.checked_in,
-            'registered_at': d.registered_at.isoformat() if d.registered_at else None
+            'registered_at': d.registered_at.isoformat() if d.registered_at else None,
+            'can_edit': can_user_access_delegate(user, d, 'edit')[0]
         } for d in delegates.items],
         'pagination': {
             'page': delegates.page,
@@ -639,13 +664,97 @@ def get_delegates(user):
 
 
 # Allowed roles for delegate registration
-DELEGATE_REGISTRATION_ROLES = ['youth_minister', 'chair', 'chairperson', 'admin', 'super_admin']
+DELEGATE_REGISTRATION_ROLES = ['youth_minister', 'minister', 'chair', 'chairperson', 'admin', 'super_admin']
 
 # Allowed roles for payment confirmation
 PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin']
 
 # Allowed roles for bulk upload
 BULK_UPLOAD_ROLES = ['finance', 'treasurer', 'data_entry', 'data_entry_clerk', 'registration', 'registration_officer', 'admin', 'super_admin']
+
+# Roles with full access (can view/edit all delegates)
+FULL_ACCESS_ROLES = ['admin', 'super_admin', 'finance', 'treasurer', 'data_entry', 'data_entry_clerk', 'registration', 'registration_officer']
+
+
+def can_user_access_delegate(user, delegate, action='view'):
+    """
+    Check if user can access a delegate based on their role and scope.
+    
+    Permission hierarchy:
+    - super_admin/admin: Full access to all delegates
+    - finance/treasurer/data_entry/registration: Full access (for their specific functions)
+    - youth_minister/minister: Can access delegates in their archdeaconry only
+    - chair/chairperson: Can access delegates in their parish only
+    
+    Args:
+        user: The current user
+        delegate: The delegate being accessed
+        action: 'view', 'edit', or 'delete'
+    
+    Returns:
+        tuple: (allowed: bool, error_message: str or None)
+    """
+    # Super admin and admin have full access
+    if user.role in ['super_admin', 'admin']:
+        return True, None
+    
+    # User always has access to delegates they registered
+    if delegate.registered_by == user.id:
+        return True, None
+    
+    # Finance and data roles have full access for their functions
+    if user.role in FULL_ACCESS_ROLES:
+        return True, None
+    
+    # Youth minister can access delegates in their archdeaconry
+    if user.role in ['youth_minister', 'minister']:
+        if user.archdeaconry and delegate.archdeaconry == user.archdeaconry:
+            return True, None
+        else:
+            return False, f'Access denied. You can only {action} delegates from your archdeaconry ({user.archdeaconry or "not set"}).'
+    
+    # Chairperson can access delegates in their parish
+    if user.role in ['chair', 'chairperson']:
+        if user.parish and delegate.parish == user.parish:
+            return True, None
+        else:
+            return False, f'Access denied. You can only {action} delegates from your parish ({user.parish or "not set"}).'
+    
+    # Default: deny access
+    return False, 'Access denied. You do not have permission to access this delegate.'
+
+
+def get_user_delegate_scope_filter(user):
+    """
+    Get a SQLAlchemy filter for delegates based on user's role and scope.
+    
+    Returns a filter that limits delegates to the user's scope:
+    - super_admin/admin/finance/etc: No filter (all delegates)
+    - youth_minister: Filter by archdeaconry
+    - chairperson: Filter by parish
+    """
+    # Full access roles see all delegates
+    if user.role in FULL_ACCESS_ROLES or user.role in ['super_admin', 'admin']:
+        return None  # No filter needed
+    
+    # Youth minister: filter by archdeaconry
+    if user.role in ['youth_minister', 'minister']:
+        if user.archdeaconry:
+            return Delegate.archdeaconry == user.archdeaconry
+        else:
+            # If archdeaconry not set, only show their own registered delegates
+            return Delegate.registered_by == user.id
+    
+    # Chairperson: filter by parish
+    if user.role in ['chair', 'chairperson']:
+        if user.parish:
+            return Delegate.parish == user.parish
+        else:
+            # If parish not set, only show their own registered delegates
+            return Delegate.registered_by == user.id
+    
+    # Default: only show their own delegates
+    return Delegate.registered_by == user.id
 
 
 @mobile_api_bp.route('/delegates', methods=['POST'])
@@ -935,14 +1044,20 @@ def get_upload_template():
 @mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['GET'])
 @token_required
 def get_delegate(user, delegate_id):
-    """Get single delegate details"""
+    """Get single delegate details - respects role-based scope"""
     delegate = Delegate.query.get_or_404(delegate_id)
     
-    # Check ownership or admin
-    if delegate.registered_by != user.id and not user.is_admin():
-        return jsonify({'error': 'Access denied'}), 403
+    # Check access permission based on role and scope
+    can_access, error_msg = can_user_access_delegate(user, delegate, 'view')
+    if not can_access:
+        return jsonify({'success': False, 'error': error_msg}), 403
+    
+    # Check if user can edit this delegate
+    can_edit, _ = can_user_access_delegate(user, delegate, 'edit')
     
     return jsonify({
+        'success': True,
+        'can_edit': can_edit,
         'delegate': {
             'id': delegate.id,
             'ticket_number': delegate.ticket_number,
@@ -968,48 +1083,64 @@ def get_delegate(user, delegate_id):
 @mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['PUT'])
 @token_required
 def update_delegate(user, delegate_id):
-    """Update delegate details"""
-    delegate = Delegate.query.get_or_404(delegate_id)
-    
-    # Check ownership or admin
-    if delegate.registered_by != user.id and not user.is_admin():
-        return jsonify({'error': 'Access denied'}), 403
-    
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    # Update allowed fields
-    allowed_fields = ['name', 'phone_number', 'local_church', 'parish', 
-                      'archdeaconry', 'gender', 'category', 'id_number']
-    for field in allowed_fields:
-        if field in data:
-            setattr(delegate, field, data[field])
-    
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Delegate updated',
-        'delegate': {
-            'id': delegate.id,
-            'ticket_number': delegate.ticket_number,
-            'name': delegate.name
-        }
-    })
+    """
+    Update delegate details - respects role-based scope:
+    - youth_minister: Can only edit delegates in their archdeaconry
+    - chairperson: Can only edit delegates in their parish
+    - admin/super_admin/finance/data_entry: Can edit all delegates
+    """
+    try:
+        delegate = Delegate.query.get_or_404(delegate_id)
+        
+        # Check access permission based on role and scope
+        can_access, error_msg = can_user_access_delegate(user, delegate, 'edit')
+        if not can_access:
+            return jsonify({'success': False, 'error': error_msg}), 403
+        
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        # Update allowed fields
+        allowed_fields = ['name', 'phone_number', 'local_church', 'parish', 
+                          'archdeaconry', 'gender', 'category', 'id_number']
+        for field in allowed_fields:
+            if field in data:
+                setattr(delegate, field, data[field])
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Delegate updated',
+            'delegate': {
+                'id': delegate.id,
+                'ticket_number': delegate.ticket_number,
+                'name': delegate.name
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to update: {str(e)}'}), 500
 
 
 @mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['DELETE'])
 @token_required
 def api_delete_delegate(user, delegate_id):
-    """Delete a delegate"""
+    """
+    Delete a delegate - respects role-based scope:
+    - youth_minister: Can only delete delegates in their archdeaconry
+    - chairperson: Can only delete delegates in their parish
+    - admin/super_admin: Can delete any delegate
+    """
     try:
         delegate = Delegate.query.get_or_404(delegate_id)
         
-        # Check ownership or admin
-        if delegate.registered_by != user.id and not user.is_admin():
-            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        # Check access permission based on role and scope
+        can_access, error_msg = can_user_access_delegate(user, delegate, 'delete')
+        if not can_access:
+            return jsonify({'success': False, 'error': error_msg}), 403
         
         # Don't allow deleting checked-in delegates
         if delegate.checked_in:
@@ -1036,6 +1167,184 @@ def api_delete_delegate(user, delegate_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Failed to delete: {str(e)}'}), 500
+
+
+# ==================== TICKET ENDPOINTS ====================
+
+@mobile_api_bp.route('/delegates/<int:delegate_id>/ticket', methods=['GET'])
+@token_required
+def get_delegate_ticket(user, delegate_id):
+    """
+    Get ticket/badge details for a delegate including QR code data.
+    This allows displaying the ticket in the app without scanning.
+    """
+    try:
+        delegate = Delegate.query.get_or_404(delegate_id)
+        
+        # Check access permission
+        can_access, error_msg = can_user_access_delegate(user, delegate, 'view')
+        if not can_access:
+            return jsonify({'success': False, 'error': error_msg}), 403
+        
+        # Get event info
+        event_name = delegate.event.name if delegate.event else 'KAYO Event'
+        event_venue = delegate.event.venue if delegate.event else ''
+        event_dates = ''
+        if delegate.event and delegate.event.start_date:
+            start = delegate.event.start_date.strftime('%d %b %Y')
+            end = delegate.event.end_date.strftime('%d %b %Y') if delegate.event.end_date else ''
+            event_dates = f"{start} - {end}" if end else start
+        
+        # Generate QR code data string (same format used for scanning)
+        qr_data = f"KAYO|{delegate.ticket_number}|{delegate.name}|{delegate.phone_number or 'N/A'}"
+        
+        # Try to generate QR code image as base64
+        qr_image_base64 = None
+        try:
+            qr_image_base64 = delegate.generate_qr_code()
+        except:
+            pass  # QR code generation not available
+        
+        # Get pricing info
+        price = delegate.pricing_tier.price if delegate.pricing_tier else 1000
+        tier_name = delegate.pricing_tier.name if delegate.pricing_tier else 'Standard'
+        
+        return jsonify({
+            'success': True,
+            'ticket': {
+                'ticket_number': delegate.ticket_number,
+                'delegate_number': delegate.delegate_number,
+                'name': delegate.name,
+                'phone_number': delegate.phone_number,
+                'local_church': delegate.local_church,
+                'parish': delegate.parish,
+                'archdeaconry': delegate.archdeaconry,
+                'category': delegate.category,
+                'gender': delegate.gender,
+                'qr_data': qr_data,
+                'qr_image_base64': qr_image_base64,
+                'is_paid': delegate.is_paid,
+                'payment_status': 'PAID' if delegate.is_paid else 'UNPAID',
+                'amount': price,
+                'tier': tier_name,
+                'checked_in': delegate.checked_in,
+                'event': {
+                    'name': event_name,
+                    'venue': event_venue,
+                    'dates': event_dates
+                }
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Failed to get ticket: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/delegates/my-tickets', methods=['GET'])
+@token_required
+def get_my_delegate_tickets(user):
+    """
+    Get all tickets for delegates registered by the current user.
+    Returns ticket info that can be displayed/shared without scanning.
+    """
+    try:
+        event_id = request.args.get('event_id', type=int)
+        paid_only = request.args.get('paid_only', 'false').lower() == 'true'
+        
+        query = Delegate.query.filter_by(registered_by=user.id)
+        
+        if event_id:
+            query = query.filter_by(event_id=event_id)
+        
+        if paid_only:
+            query = query.filter_by(is_paid=True)
+        
+        delegates = query.order_by(Delegate.registered_at.desc()).all()
+        
+        tickets = []
+        for d in delegates:
+            qr_data = f"KAYO|{d.ticket_number}|{d.name}|{d.phone_number or 'N/A'}"
+            
+            tickets.append({
+                'id': d.id,
+                'ticket_number': d.ticket_number,
+                'delegate_number': d.delegate_number,
+                'name': d.name,
+                'phone_number': d.phone_number,
+                'local_church': d.local_church,
+                'parish': d.parish,
+                'archdeaconry': d.archdeaconry,
+                'category': d.category,
+                'qr_data': qr_data,
+                'is_paid': d.is_paid,
+                'payment_status': 'PAID' if d.is_paid else 'UNPAID',
+                'checked_in': d.checked_in
+            })
+        
+        return jsonify({
+            'success': True,
+            'count': len(tickets),
+            'tickets': tickets
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Failed to get tickets: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/tickets/lookup', methods=['GET'])
+@token_required  
+def lookup_ticket(user):
+    """
+    Look up a ticket by ticket number without scanning.
+    Returns full ticket details if found.
+    """
+    try:
+        ticket_number = request.args.get('ticket_number', '').strip()
+        
+        if not ticket_number:
+            return jsonify({'success': False, 'error': 'Ticket number is required'}), 400
+        
+        # Find delegate by ticket number
+        delegate = Delegate.query.filter(
+            db.or_(
+                Delegate.ticket_number == ticket_number,
+                Delegate.ticket_number.ilike(f'%{ticket_number}%')
+            )
+        ).first()
+        
+        if not delegate:
+            return jsonify({
+                'success': False, 
+                'error': f'No delegate found with ticket number: {ticket_number}'
+            }), 404
+        
+        # Check access permission
+        can_access, error_msg = can_user_access_delegate(user, delegate, 'view')
+        if not can_access:
+            return jsonify({'success': False, 'error': error_msg}), 403
+        
+        qr_data = f"KAYO|{delegate.ticket_number}|{delegate.name}|{delegate.phone_number or 'N/A'}"
+        
+        return jsonify({
+            'success': True,
+            'delegate': {
+                'id': delegate.id,
+                'ticket_number': delegate.ticket_number,
+                'delegate_number': delegate.delegate_number,
+                'name': delegate.name,
+                'phone_number': delegate.phone_number,
+                'local_church': delegate.local_church,
+                'parish': delegate.parish,
+                'archdeaconry': delegate.archdeaconry,
+                'category': delegate.category,
+                'gender': delegate.gender,
+                'qr_data': qr_data,
+                'is_paid': delegate.is_paid,
+                'payment_status': 'PAID' if delegate.is_paid else 'UNPAID',
+                'checked_in': delegate.checked_in,
+                'checked_in_at': delegate.checked_in_at.isoformat() if delegate.checked_in_at else None
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Lookup failed: {str(e)}'}), 500
 
 
 # ==================== CHECK-IN ENDPOINTS ====================
@@ -1178,30 +1487,123 @@ def manual_checkin(user):
 @mobile_api_bp.route('/dashboard/stats', methods=['GET'])
 @token_required
 def get_dashboard_stats(user):
-    """Get dashboard statistics for mobile app"""
+    """
+    Get dashboard statistics based on user's scope:
+    - Shows stats for user's registered delegates
+    - Also includes scope-based stats (archdeaconry/parish)
+    """
     event_id = request.args.get('event_id', type=int)
     
-    # Base query for user's delegates
-    query = Delegate.query.filter_by(registered_by=user.id)
+    # Stats for user's own registered delegates
+    own_query = Delegate.query.filter_by(registered_by=user.id)
     if event_id:
-        query = query.filter_by(event_id=event_id)
+        own_query = own_query.filter_by(event_id=event_id)
     
-    total_delegates = query.count()
-    paid_delegates = query.filter_by(is_paid=True).count()
-    unpaid_delegates = total_delegates - paid_delegates
-    checked_in = query.filter_by(checked_in=True).count()
+    own_total = own_query.count()
+    own_paid = own_query.filter_by(is_paid=True).count()
+    own_checked_in = own_query.filter_by(checked_in=True).count()
     
-    # Amount due
-    unpaid_query = query.filter_by(is_paid=False)
+    # Stats for user's scope (archdeaconry/parish)
+    scope_filter = get_user_delegate_scope_filter(user)
+    scope_query = Delegate.query
+    if scope_filter is not None:
+        scope_query = scope_query.filter(scope_filter)
+    if event_id:
+        scope_query = scope_query.filter_by(event_id=event_id)
+    
+    scope_total = scope_query.count()
+    scope_paid = scope_query.filter_by(is_paid=True).count()
+    scope_checked_in = scope_query.filter_by(checked_in=True).count()
+    
+    # Amount due for user's delegates
+    unpaid_query = own_query.filter_by(is_paid=False)
     total_due = sum([d.pricing_tier.price if d.pricing_tier else 1000 for d in unpaid_query.all()])
     
+    # Determine scope type
+    scope_type = 'all' if user.role in FULL_ACCESS_ROLES else \
+                 'archdeaconry' if user.role in ['youth_minister', 'minister'] else \
+                 'parish' if user.role in ['chair', 'chairperson'] else 'own'
+    scope_name = user.archdeaconry if scope_type == 'archdeaconry' else \
+                 user.parish if scope_type == 'parish' else None
+    
     return jsonify({
-        'stats': {
-            'total_delegates': total_delegates,
-            'paid_delegates': paid_delegates,
-            'unpaid_delegates': unpaid_delegates,
-            'checked_in': checked_in,
+        'success': True,
+        'my_stats': {
+            'total_delegates': own_total,
+            'paid_delegates': own_paid,
+            'unpaid_delegates': own_total - own_paid,
+            'checked_in': own_checked_in,
             'total_amount_due': total_due
+        },
+        'scope_stats': {
+            'scope_type': scope_type,
+            'scope_name': scope_name,
+            'total_delegates': scope_total,
+            'paid_delegates': scope_paid,
+            'unpaid_delegates': scope_total - scope_paid,
+            'checked_in': scope_checked_in
+        }
+    })
+
+
+@mobile_api_bp.route('/dashboard/all-stats', methods=['GET'])
+@token_required
+def get_all_archdeaconry_stats(user):
+    """
+    Get statistics for all archdeaconries - available to all users for viewing
+    Users can view stats of all archdeaconries but can only edit delegates in their scope
+    """
+    event_id = request.args.get('event_id', type=int)
+    
+    # Get all archdeaconries with stats
+    from app.church_data import CHURCH_DATA
+    
+    archdeaconry_stats = []
+    
+    for archdeaconry in sorted(CHURCH_DATA.keys()):
+        query = Delegate.query.filter_by(archdeaconry=archdeaconry)
+        if event_id:
+            query = query.filter_by(event_id=event_id)
+        
+        total = query.count()
+        paid = query.filter_by(is_paid=True).count()
+        checked_in = query.filter_by(checked_in=True).count()
+        
+        archdeaconry_stats.append({
+            'archdeaconry': archdeaconry,
+            'total_delegates': total,
+            'paid_delegates': paid,
+            'unpaid_delegates': total - paid,
+            'checked_in': checked_in,
+            'payment_percentage': round((paid / total * 100) if total > 0 else 0, 1),
+            'checkin_percentage': round((checked_in / total * 100) if total > 0 else 0, 1)
+        })
+    
+    # Overall totals
+    total_query = Delegate.query
+    if event_id:
+        total_query = total_query.filter_by(event_id=event_id)
+    
+    overall_total = total_query.count()
+    overall_paid = total_query.filter_by(is_paid=True).count()
+    overall_checked_in = total_query.filter_by(checked_in=True).count()
+    
+    return jsonify({
+        'success': True,
+        'overall': {
+            'total_delegates': overall_total,
+            'paid_delegates': overall_paid,
+            'unpaid_delegates': overall_total - overall_paid,
+            'checked_in': overall_checked_in,
+            'payment_percentage': round((overall_paid / overall_total * 100) if overall_total > 0 else 0, 1),
+            'checkin_percentage': round((overall_checked_in / overall_total * 100) if overall_total > 0 else 0, 1)
+        },
+        'archdeaconries': archdeaconry_stats,
+        'user_scope': {
+            'role': user.role,
+            'can_edit_scope': user.archdeaconry if user.role in ['youth_minister', 'minister'] else 
+                              user.parish if user.role in ['chair', 'chairperson'] else 
+                              'all' if user.role in FULL_ACCESS_ROLES else 'own'
         }
     })
 
@@ -1209,20 +1611,28 @@ def get_dashboard_stats(user):
 @mobile_api_bp.route('/dashboard/recent-delegates', methods=['GET'])
 @token_required
 def get_recent_delegates(user):
-    """Get recently registered delegates"""
+    """Get recently registered delegates within user's scope"""
     limit = request.args.get('limit', 10, type=int)
     
-    delegates = Delegate.query.filter_by(registered_by=user.id)\
-        .order_by(Delegate.registered_at.desc())\
-        .limit(limit).all()
+    # Apply scope filter
+    scope_filter = get_user_delegate_scope_filter(user)
+    query = Delegate.query
+    if scope_filter is not None:
+        query = query.filter(scope_filter)
+    
+    delegates = query.order_by(Delegate.registered_at.desc()).limit(limit).all()
     
     return jsonify({
+        'success': True,
         'delegates': [{
             'id': d.id,
             'ticket_number': d.ticket_number,
             'name': d.name,
+            'parish': d.parish,
+            'archdeaconry': d.archdeaconry,
             'is_paid': d.is_paid,
-            'registered_at': d.registered_at.isoformat() if d.registered_at else None
+            'registered_at': d.registered_at.isoformat() if d.registered_at else None,
+            'can_edit': can_user_access_delegate(user, d, 'edit')[0]
         } for d in delegates]
     })
 
