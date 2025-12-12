@@ -211,13 +211,20 @@ def mobile_login():
         if not data:
             return jsonify({'success': False, 'error': 'No data provided'}), 400
         
-        email = data.get('email')
+        # Accept email, phone, or email_or_phone field
+        email_or_phone = data.get('email_or_phone') or data.get('email') or data.get('phone')
         password = data.get('password')
         
-        if not email or not password:
-            return jsonify({'success': False, 'error': 'Email and password required'}), 400
+        if not email_or_phone or not password:
+            return jsonify({'success': False, 'error': 'Email/phone and password required'}), 400
         
-        user = User.query.filter_by(email=email).first()
+        # Try to find user by email or phone
+        user = User.query.filter(
+            db.or_(
+                User.email == email_or_phone,
+                User.phone == email_or_phone
+            )
+        ).first()
         
         if not user or not user.check_password(password):
             return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
@@ -258,114 +265,163 @@ def mobile_login():
 @mobile_api_bp.route('/auth/register', methods=['POST'])
 def mobile_register():
     """Register new user via mobile app"""
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    required_fields = ['name', 'email', 'password', 'role']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'error': f'{field} is required'}), 400
-    
-    # Check if email exists
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': 'Email already registered'}), 400
-    
-    user = User(
-        name=data['name'],
-        email=data['email'],
-        phone=data.get('phone'),
-        role=data['role'],
-        local_church=data.get('local_church'),
-        parish=data.get('parish'),
-        archdeaconry=data.get('archdeaconry'),
-        oauth_provider='local'
-    )
-    user.set_password(data['password'])
-    
-    db.session.add(user)
-    db.session.commit()
-    
-    # Generate token
-    token = generate_token(user.id)
-    
-    return jsonify({
-        'success': True,
-        'message': 'Registration successful',
-        'token': token,
-        'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'role': user.role
-        }
-    }), 201
+    try:
+        # Check if JWT is available first
+        if not HAS_JWT:
+            return jsonify({
+                'success': False,
+                'error': 'Authentication service temporarily unavailable. Please try again later.'
+            }), 503
+        
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        # Required fields - role defaults to 'chair' if not provided
+        required_fields = ['name', 'email', 'password']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'{field} is required'}), 400
+        
+        # Validate email format
+        email = data['email'].strip().lower()
+        if '@' not in email:
+            return jsonify({'success': False, 'error': 'Invalid email format'}), 400
+        
+        # Check if email exists
+        if User.query.filter_by(email=email).first():
+            return jsonify({'success': False, 'error': 'Email already registered'}), 400
+        
+        # Check if phone exists (if provided)
+        phone = data.get('phone', '').strip()
+        if phone and User.query.filter_by(phone=phone).first():
+            return jsonify({'success': False, 'error': 'Phone number already registered'}), 400
+        
+        # Validate role
+        valid_roles = ['chair', 'minister', 'clerk', 'treasurer', 'user']
+        role = data.get('role', 'chair').lower()
+        if role not in valid_roles:
+            role = 'chair'  # Default to chair if invalid
+        
+        user = User(
+            name=data['name'].strip(),
+            email=email,
+            phone=phone if phone else None,
+            role=role,
+            local_church=data.get('local_church', '').strip() or None,
+            parish=data.get('parish', '').strip() or None,
+            archdeaconry=data.get('archdeaconry', '').strip() or None,
+            oauth_provider='local'
+        )
+        user.set_password(data['password'])
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Generate token
+        token = generate_token(user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registration successful',
+            'token': token,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'role': user.role,
+                'local_church': user.local_church,
+                'parish': user.parish,
+                'archdeaconry': user.archdeaconry
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Registration failed: {str(e)}'
+        }), 500
 
 
 @mobile_api_bp.route('/auth/google', methods=['POST'])
 def mobile_google_auth():
     """Google OAuth authentication for mobile"""
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    google_id = data.get('google_id')
-    email = data.get('email')
-    name = data.get('name')
-    profile_picture = data.get('profile_picture')
-    
-    if not google_id or not email:
-        return jsonify({'error': 'Google ID and email required'}), 400
-    
-    # Check if user exists by Google ID
-    user = User.query.filter_by(google_id=google_id).first()
-    
-    if not user:
-        # Check by email
-        user = User.query.filter_by(email=email).first()
-        if user:
-            # Link Google account to existing user
-            user.google_id = google_id
-            user.profile_picture = profile_picture
-            user.oauth_provider = 'google'
-        else:
-            # Create new user
-            user = User(
-                name=name or email.split('@')[0],
-                email=email,
-                google_id=google_id,
-                profile_picture=profile_picture,
-                oauth_provider='google',
-                role='user'
-            )
-            db.session.add(user)
-    
-    user.last_login = datetime.utcnow()
-    db.session.commit()
-    
-    token = generate_token(user.id)
-    
-    # Check if profile is complete
-    profile_complete = bool(user.local_church and user.parish)
-    
-    return jsonify({
-        'success': True,
-        'token': token,
-        'profile_complete': profile_complete,
-        'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'role': user.role,
-            'local_church': user.local_church,
-            'parish': user.parish,
-            'archdeaconry': user.archdeaconry,
-            'profile_picture': user.profile_picture
-        }
-    })
+    try:
+        # Check if JWT is available first
+        if not HAS_JWT:
+            return jsonify({
+                'success': False,
+                'error': 'Authentication service temporarily unavailable. Please try again later.'
+            }), 503
+        
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        google_id = data.get('google_id')
+        email = data.get('email')
+        name = data.get('name')
+        profile_picture = data.get('profile_picture')
+        
+        if not google_id or not email:
+            return jsonify({'success': False, 'error': 'Google ID and email required'}), 400
+        
+        # Check if user exists by Google ID
+        user = User.query.filter_by(google_id=google_id).first()
+        
+        if not user:
+            # Check by email
+            user = User.query.filter_by(email=email).first()
+            if user:
+                # Link Google account to existing user
+                user.google_id = google_id
+                user.profile_picture = profile_picture
+                user.oauth_provider = 'google'
+            else:
+                # Create new user
+                user = User(
+                    name=name or email.split('@')[0],
+                    email=email,
+                    google_id=google_id,
+                    profile_picture=profile_picture,
+                    oauth_provider='google',
+                    role='chair'  # Default to chair role
+                )
+                db.session.add(user)
+        
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        token = generate_token(user.id)
+        
+        # Check if profile is complete
+        profile_complete = bool(user.local_church and user.parish)
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'profile_complete': profile_complete,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'role': user.role,
+                'local_church': user.local_church,
+                'parish': user.parish,
+                'archdeaconry': user.archdeaconry,
+                'profile_picture': user.profile_picture
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Google authentication failed: {str(e)}'
+        }), 500
 
 
 @mobile_api_bp.route('/auth/profile', methods=['GET'])
