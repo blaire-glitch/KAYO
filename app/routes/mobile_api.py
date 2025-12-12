@@ -569,6 +569,9 @@ DELEGATE_REGISTRATION_ROLES = ['youth_minister', 'chair', 'chairperson', 'admin'
 # Allowed roles for payment confirmation
 PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin']
 
+# Allowed roles for bulk upload
+BULK_UPLOAD_ROLES = ['finance', 'treasurer', 'data_entry', 'data_entry_clerk', 'registration', 'registration_officer', 'admin', 'super_admin']
+
 
 @mobile_api_bp.route('/delegates', methods=['POST'])
 @token_required
@@ -645,6 +648,213 @@ def register_delegate(user):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/delegates/bulk-upload', methods=['POST'])
+@token_required
+def bulk_upload_delegates(user):
+    """Bulk upload delegates from Excel file - Finance, Data Entry, Registration Officer only"""
+    try:
+        # Check if user has permission to bulk upload
+        if user.role not in BULK_UPLOAD_ROLES:
+            return jsonify({
+                'success': False,
+                'error': 'Access denied. Only Finance, Data Entry Clerks, and Registration Officers can upload delegates.'
+            }), 403
+        
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        # Check file extension
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            return jsonify({'success': False, 'error': 'Invalid file format. Please upload an Excel file (.xlsx or .xls)'}), 400
+        
+        # Try to import pandas/openpyxl
+        try:
+            import pandas as pd
+        except ImportError:
+            return jsonify({'success': False, 'error': 'Excel processing not available on server'}), 503
+        
+        # Get event
+        event_id = request.form.get('event_id')
+        event = Event.query.get(event_id) if event_id else Event.query.filter_by(is_active=True).first()
+        
+        if not event:
+            return jsonify({'success': False, 'error': 'No active event found'}), 400
+        
+        # Read Excel file
+        try:
+            df = pd.read_excel(file)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Failed to read Excel file: {str(e)}'}), 400
+        
+        # Expected columns (case-insensitive matching)
+        df.columns = df.columns.str.strip().str.lower()
+        
+        # Map column names
+        column_mapping = {
+            'name': ['name', 'full name', 'delegate name', 'fullname'],
+            'phone_number': ['phone', 'phone number', 'phone_number', 'telephone', 'mobile', 'contact'],
+            'id_number': ['id', 'id number', 'id_number', 'national id', 'id no'],
+            'gender': ['gender', 'sex'],
+            'local_church': ['local church', 'local_church', 'church', 'lc'],
+            'parish': ['parish'],
+            'archdeaconry': ['archdeaconry', 'arch'],
+            'category': ['category', 'type', 'delegate type']
+        }
+        
+        # Find actual column names
+        def find_column(df_cols, possible_names):
+            for name in possible_names:
+                if name in df_cols:
+                    return name
+            return None
+        
+        actual_columns = {}
+        for field, possible in column_mapping.items():
+            found = find_column(list(df.columns), possible)
+            if found:
+                actual_columns[field] = found
+        
+        # Check required columns
+        required = ['name', 'gender', 'local_church', 'parish', 'archdeaconry']
+        missing = [r for r in required if r not in actual_columns]
+        if missing:
+            return jsonify({
+                'success': False,
+                'error': f'Missing required columns: {", ".join(missing)}. Required: Name, Gender, Local Church, Parish, Archdeaconry'
+            }), 400
+        
+        # Process rows
+        created = []
+        errors = []
+        skipped = []
+        
+        for index, row in df.iterrows():
+            row_num = index + 2  # Excel row number (1-indexed + header)
+            try:
+                name = str(row[actual_columns['name']]).strip() if pd.notna(row[actual_columns['name']]) else ''
+                
+                if not name or name.lower() == 'nan':
+                    skipped.append({'row': row_num, 'reason': 'Empty name'})
+                    continue
+                
+                gender = str(row[actual_columns['gender']]).strip().lower() if pd.notna(row[actual_columns['gender']]) else ''
+                local_church = str(row[actual_columns['local_church']]).strip() if pd.notna(row[actual_columns['local_church']]) else ''
+                parish = str(row[actual_columns['parish']]).strip() if pd.notna(row[actual_columns['parish']]) else ''
+                archdeaconry = str(row[actual_columns['archdeaconry']]).strip() if pd.notna(row[actual_columns['archdeaconry']]) else ''
+                
+                phone_number = None
+                if 'phone_number' in actual_columns:
+                    phone_val = row[actual_columns['phone_number']]
+                    if pd.notna(phone_val):
+                        phone_number = str(phone_val).strip().replace('.0', '')
+                
+                id_number = None
+                if 'id_number' in actual_columns:
+                    id_val = row[actual_columns['id_number']]
+                    if pd.notna(id_val):
+                        id_number = str(id_val).strip().replace('.0', '')
+                
+                category = 'delegate'
+                if 'category' in actual_columns:
+                    cat_val = row[actual_columns['category']]
+                    if pd.notna(cat_val):
+                        category = str(cat_val).strip().lower()
+                
+                # Normalize gender
+                if gender in ['m', 'male', 'man']:
+                    gender = 'male'
+                elif gender in ['f', 'female', 'woman']:
+                    gender = 'female'
+                else:
+                    gender = 'other'
+                
+                # Check for duplicate phone
+                if phone_number:
+                    existing = Delegate.query.filter_by(
+                        phone_number=phone_number,
+                        event_id=event.id
+                    ).first()
+                    if existing:
+                        skipped.append({'row': row_num, 'name': name, 'reason': f'Phone {phone_number} already registered'})
+                        continue
+                
+                # Generate ticket number
+                ticket_number = Delegate.generate_ticket_number(event)
+                delegate_number = Delegate.get_next_delegate_number(event.id)
+                
+                delegate = Delegate(
+                    ticket_number=ticket_number,
+                    delegate_number=delegate_number,
+                    name=name,
+                    local_church=local_church,
+                    parish=parish,
+                    archdeaconry=archdeaconry,
+                    phone_number=phone_number,
+                    id_number=id_number,
+                    gender=gender,
+                    category=category,
+                    event_id=event.id,
+                    registered_by=user.id
+                )
+                
+                db.session.add(delegate)
+                created.append({'row': row_num, 'name': name, 'ticket': ticket_number})
+                
+            except Exception as e:
+                errors.append({'row': row_num, 'error': str(e)})
+        
+        # Commit all
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully uploaded {len(created)} delegates',
+            'summary': {
+                'total_rows': len(df),
+                'created': len(created),
+                'skipped': len(skipped),
+                'errors': len(errors)
+            },
+            'created': created[:20],  # First 20 for display
+            'skipped': skipped[:20],
+            'errors': errors[:20]
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Upload failed: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/delegates/upload-template', methods=['GET'])
+def get_upload_template():
+    """Get Excel template for bulk upload"""
+    return jsonify({
+        'success': True,
+        'template': {
+            'required_columns': ['Name', 'Gender', 'Local Church', 'Parish', 'Archdeaconry'],
+            'optional_columns': ['Phone Number', 'ID Number', 'Category'],
+            'gender_values': ['Male', 'Female'],
+            'category_values': ['delegate', 'leader', 'speaker', 'vip'],
+            'example_row': {
+                'Name': 'John Doe',
+                'Gender': 'Male',
+                'Local Church': 'St. Peters',
+                'Parish': 'Nasira Parish',
+                'Archdeaconry': 'Nambale Archdeaconry',
+                'Phone Number': '0712345678',
+                'ID Number': '12345678',
+                'Category': 'delegate'
+            }
+        }
+    })
 
 
 @mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['GET'])
