@@ -428,59 +428,78 @@ def mobile_google_auth():
 @token_required
 def get_profile(user):
     """Get current user profile"""
-    return jsonify({
-        'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'role': user.role,
-            'local_church': user.local_church,
-            'parish': user.parish,
-            'archdeaconry': user.archdeaconry,
-            'profile_picture': user.profile_picture,
-            'created_at': user.created_at.isoformat() if user.created_at else None,
-            'last_login': user.last_login.isoformat() if user.last_login else None,
-            'permissions': {
-                'can_register_delegates': user.role in DELEGATE_REGISTRATION_ROLES,
-                'can_confirm_payments': user.role in PAYMENT_CONFIRMATION_ROLES,
-                'is_admin': user.is_admin()
+    try:
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'role': user.role,
+                'local_church': user.local_church,
+                'parish': user.parish,
+                'archdeaconry': user.archdeaconry,
+                'profile_picture': user.profile_picture,
+                'created_at': user.created_at.isoformat() if user.created_at else None,
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'permissions': {
+                    'can_register_delegates': user.role in DELEGATE_REGISTRATION_ROLES,
+                    'can_confirm_payments': user.role in PAYMENT_CONFIRMATION_ROLES,
+                    'is_admin': user.is_admin()
+                }
             }
-        }
-    })
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get profile: {str(e)}'
+        }), 500
 
 
 @mobile_api_bp.route('/auth/profile', methods=['PUT'])
 @token_required
 def update_profile(user):
     """Update user profile"""
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    # Update allowed fields
-    allowed_fields = ['name', 'phone', 'local_church', 'parish', 'archdeaconry', 'role']
-    for field in allowed_fields:
-        if field in data:
-            setattr(user, field, data[field])
-    
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Profile updated',
-        'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'role': user.role,
-            'local_church': user.local_church,
-            'parish': user.parish,
-            'archdeaconry': user.archdeaconry
-        }
-    })
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        # Update allowed fields
+        allowed_fields = ['name', 'phone', 'local_church', 'parish', 'archdeaconry', 'role']
+        for field in allowed_fields:
+            if field in data:
+                value = data[field]
+                # Handle empty strings as None for optional fields
+                if value == '' and field in ['phone', 'local_church', 'parish', 'archdeaconry']:
+                    value = None
+                setattr(user, field, value)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Profile updated',
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'role': user.role,
+                'local_church': user.local_church,
+                'parish': user.parish,
+                'archdeaconry': user.archdeaconry,
+                'profile_picture': user.profile_picture
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to update profile: {str(e)}'
+        }), 500
 
 
 # ==================== CHURCH DATA ENDPOINTS ====================
