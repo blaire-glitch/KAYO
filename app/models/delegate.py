@@ -44,6 +44,8 @@ class Delegate(db.Model):
     is_paid = db.Column(db.Boolean, default=False)
     payment_id = db.Column(db.Integer, db.ForeignKey('payments.id'), nullable=True)
     amount_paid = db.Column(db.Float, default=0)
+    payment_confirmed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    payment_confirmed_at = db.Column(db.DateTime, nullable=True)
     
     # Check-in tracking
     checked_in = db.Column(db.Boolean, default=False)

@@ -384,7 +384,12 @@ def get_profile(user):
             'archdeaconry': user.archdeaconry,
             'profile_picture': user.profile_picture,
             'created_at': user.created_at.isoformat() if user.created_at else None,
-            'last_login': user.last_login.isoformat() if user.last_login else None
+            'last_login': user.last_login.isoformat() if user.last_login else None,
+            'permissions': {
+                'can_register_delegates': user.role in DELEGATE_REGISTRATION_ROLES,
+                'can_confirm_payments': user.role in PAYMENT_CONFIRMATION_ROLES,
+                'is_admin': user.is_admin()
+            }
         }
     })
 
@@ -558,11 +563,25 @@ def get_delegates(user):
     })
 
 
+# Allowed roles for delegate registration
+DELEGATE_REGISTRATION_ROLES = ['youth_minister', 'chair', 'chairperson', 'admin', 'super_admin']
+
+# Allowed roles for payment confirmation
+PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin']
+
+
 @mobile_api_bp.route('/delegates', methods=['POST'])
 @token_required
 def register_delegate(user):
-    """Register a new delegate"""
+    """Register a new delegate - only youth ministers and chairpersons"""
     try:
+        # Check if user has permission to register delegates
+        if user.role not in DELEGATE_REGISTRATION_ROLES:
+            return jsonify({
+                'success': False, 
+                'error': 'Access denied. Only Youth Ministers and Chairpersons can register delegates.'
+            }), 403
+        
         data = request.get_json()
         
         if not data:
@@ -1008,6 +1027,107 @@ def check_payment_status(user, payment_id):
             'transaction_id': payment.transaction_id,
             'created_at': payment.created_at.isoformat() if payment.created_at else None
         }
+    })
+
+
+@mobile_api_bp.route('/payments/confirm', methods=['POST'])
+@token_required
+def confirm_payment(user):
+    """Confirm payment manually - only finance/treasurer can do this"""
+    # Check if user has permission to confirm payments
+    if user.role not in PAYMENT_CONFIRMATION_ROLES:
+        return jsonify({
+            'success': False,
+            'error': 'Access denied. Only Finance personnel can confirm payments.'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        delegate_ids = data.get('delegate_ids', [])
+        receipt_number = data.get('receipt_number')
+        payment_method = data.get('payment_method', 'cash')  # cash, mpesa, bank
+        amount = data.get('amount')
+        notes = data.get('notes', '')
+        
+        if not delegate_ids:
+            return jsonify({'success': False, 'error': 'No delegates selected'}), 400
+        
+        # Get delegates
+        delegates = Delegate.query.filter(Delegate.id.in_(delegate_ids)).all()
+        
+        if not delegates:
+            return jsonify({'success': False, 'error': 'No delegates found'}), 404
+        
+        # Mark delegates as paid
+        for delegate in delegates:
+            delegate.is_paid = True
+            delegate.payment_confirmed_by = user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Payment confirmed for {len(delegates)} delegate(s)',
+            'delegates': [{
+                'id': d.id,
+                'name': d.name,
+                'ticket_number': d.ticket_number,
+                'is_paid': d.is_paid
+            } for d in delegates]
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to confirm payment: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/payments/pending-delegates', methods=['GET'])
+@token_required
+def get_pending_payment_delegates(user):
+    """Get list of delegates with pending payments - for finance role"""
+    # Check if user has permission
+    if user.role not in PAYMENT_CONFIRMATION_ROLES:
+        return jsonify({
+            'success': False,
+            'error': 'Access denied. Only Finance personnel can view pending payments.'
+        }), 403
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    archdeaconry = request.args.get('archdeaconry')
+    parish = request.args.get('parish')
+    
+    query = Delegate.query.filter_by(is_paid=False)
+    
+    if archdeaconry:
+        query = query.filter_by(archdeaconry=archdeaconry)
+    if parish:
+        query = query.filter_by(parish=parish)
+    
+    delegates = query.order_by(Delegate.registered_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return jsonify({
+        'success': True,
+        'delegates': [{
+            'id': d.id,
+            'name': d.name,
+            'ticket_number': d.ticket_number,
+            'phone_number': d.phone_number,
+            'local_church': d.local_church,
+            'parish': d.parish,
+            'archdeaconry': d.archdeaconry,
+            'registered_by': d.registered_by_user.name if d.registered_by_user else None,
+            'registered_at': d.registered_at.isoformat() if d.registered_at else None
+        } for d in delegates.items],
+        'total': delegates.total,
+        'pages': delegates.pages,
+        'current_page': delegates.page
     })
 
 
