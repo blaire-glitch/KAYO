@@ -533,66 +533,70 @@ def get_delegates(user):
 @token_required
 def register_delegate(user):
     """Register a new delegate"""
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    required_fields = ['name', 'local_church', 'parish', 'archdeaconry', 'gender']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'error': f'{field} is required'}), 400
-    
-    # Get event
-    event_id = data.get('event_id')
-    event = Event.query.get(event_id) if event_id else Event.query.filter_by(is_active=True).first()
-    
-    if not event:
-        return jsonify({'error': 'No active event found'}), 400
-    
-    # Check for duplicates
-    if data.get('phone_number'):
-        existing = Delegate.query.filter_by(
-            phone_number=data['phone_number'],
-            event_id=event.id
-        ).first()
-        if existing:
-            return jsonify({'error': 'Phone number already registered for this event'}), 400
-    
-    # Generate ticket number
-    ticket_number = Delegate.generate_ticket_number(event)
-    delegate_number = Delegate.get_next_delegate_number(event.id)
-    
-    delegate = Delegate(
-        ticket_number=ticket_number,
-        delegate_number=delegate_number,
-        name=data['name'],
-        local_church=data['local_church'],
-        parish=data['parish'],
-        archdeaconry=data['archdeaconry'],
-        phone_number=data.get('phone_number'),
-        id_number=data.get('id_number'),
-        gender=data['gender'],
-        category=data.get('category', 'delegate'),
-        event_id=event.id,
-        pricing_tier_id=data.get('pricing_tier_id'),
-        registered_by=user.id
-    )
-    
-    db.session.add(delegate)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Delegate registered successfully',
-        'delegate': {
-            'id': delegate.id,
-            'ticket_number': delegate.ticket_number,
-            'delegate_number': delegate.delegate_number,
-            'name': delegate.name,
-            'is_paid': delegate.is_paid
-        }
-    }), 201
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        required_fields = ['name', 'local_church', 'parish', 'archdeaconry', 'gender']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'{field} is required'}), 400
+        
+        # Get event
+        event_id = data.get('event_id')
+        event = Event.query.get(event_id) if event_id else Event.query.filter_by(is_active=True).first()
+        
+        if not event:
+            return jsonify({'success': False, 'error': 'No active event found'}), 400
+        
+        # Check for duplicates
+        if data.get('phone_number'):
+            existing = Delegate.query.filter_by(
+                phone_number=data['phone_number'],
+                event_id=event.id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Phone number already registered for this event'}), 400
+        
+        # Generate ticket number
+        ticket_number = Delegate.generate_ticket_number(event)
+        delegate_number = Delegate.get_next_delegate_number(event.id)
+        
+        delegate = Delegate(
+            ticket_number=ticket_number,
+            delegate_number=delegate_number,
+            name=data['name'],
+            local_church=data['local_church'],
+            parish=data['parish'],
+            archdeaconry=data['archdeaconry'],
+            phone_number=data.get('phone_number'),
+            id_number=data.get('id_number'),
+            gender=data['gender'],
+            category=data.get('category', 'delegate'),
+            event_id=event.id,
+            pricing_tier_id=data.get('pricing_tier_id'),
+            registered_by=user.id
+        )
+        
+        db.session.add(delegate)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Delegate registered successfully',
+            'delegate': {
+                'id': delegate.id,
+                'ticket_number': delegate.ticket_number,
+                'delegate_number': delegate.delegate_number,
+                'name': delegate.name,
+                'is_paid': delegate.is_paid
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
 
 
 @mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['GET'])
