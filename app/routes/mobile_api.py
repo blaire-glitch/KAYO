@@ -165,6 +165,35 @@ def api_get_church_hierarchy():
     })
 
 
+# ==================== EVENT ENDPOINTS ====================
+@mobile_api_bp.route('/events/active', methods=['GET'])
+def get_active_event():
+    """Get current active event"""
+    try:
+        event = Event.query.filter_by(is_active=True).first()
+        
+        if not event:
+            return jsonify({
+                'success': False,
+                'error': 'No active event found. Please create an event first.'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'event': {
+                'id': event.id,
+                'name': event.name,
+                'description': event.description if hasattr(event, 'description') else None,
+                'start_date': event.start_date.isoformat() if event.start_date else None,
+                'end_date': event.end_date.isoformat() if event.end_date else None,
+                'venue': event.venue if hasattr(event, 'venue') else None,
+                'is_active': event.is_active
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
+
+
 # ==================== AUTHENTICATION ENDPOINTS ====================
 @mobile_api_bp.route('/auth/login', methods=['POST'])
 def mobile_login():
