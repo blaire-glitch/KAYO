@@ -715,8 +715,8 @@ def api_delete_delegate(user, delegate_id):
         delegate_name = delegate.name
         ticket_number = delegate.ticket_number
         
-        # Delete associated payments first (if any)
-        Payment.query.filter_by(delegate_id=delegate_id).delete()
+        # Unlink from payment (don't delete payment as it may cover other delegates)
+        delegate.payment_id = None
         
         # Delete check-in records (if any)
         CheckInRecord.query.filter_by(delegate_id=delegate_id).delete()
