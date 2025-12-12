@@ -14,12 +14,19 @@ app = create_app()
 def init_database():
     with app.app_context():
         # Create all tables
-        db.create_all()
-        print("✓ Database tables created successfully!")
+        try:
+            db.create_all()
+            print("✓ Database tables created successfully!")
+        except Exception as e:
+            print(f"⚠ Table creation warning: {e}")
+            print("  Continuing with existing tables...")
         
         # Create default roles
-        Role.create_default_roles()
-        print("✓ Default roles created!")
+        try:
+            Role.create_default_roles()
+            print("✓ Default roles created!")
+        except Exception as e:
+            print(f"ℹ Roles may already exist: {e}")
         
         # Check if admin exists
         admin = User.query.filter_by(email='admin@kayo.org').first()
