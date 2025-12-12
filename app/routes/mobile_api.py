@@ -110,7 +110,7 @@ def api_status():
 
 # ==================== CHURCH DATA ENDPOINTS ====================
 @mobile_api_bp.route('/church/archdeaconries', methods=['GET'])
-def get_archdeaconries():
+def api_get_archdeaconries():
     """Get list of all archdeaconries"""
     archdeaconries = sorted(CHURCH_DATA.keys())
     return jsonify({
@@ -121,7 +121,7 @@ def get_archdeaconries():
 
 
 @mobile_api_bp.route('/church/parishes', methods=['GET'])
-def get_parishes():
+def api_get_parishes():
     """Get parishes, optionally filtered by archdeaconry"""
     archdeaconry = request.args.get('archdeaconry')
     
@@ -148,7 +148,7 @@ def get_parishes():
 
 
 @mobile_api_bp.route('/church/hierarchy', methods=['GET'])
-def get_church_hierarchy():
+def api_get_church_hierarchy():
     """Get full church hierarchy (archdeaconries with their parishes)"""
     hierarchy = []
     for archdeaconry in sorted(CHURCH_DATA.keys()):
