@@ -49,8 +49,9 @@ def dashboard():
     # Get category stats
     category_stats = Delegate.get_category_stats()
     
-    # Get daily registration stats (last 30 days)
-    daily_stats = Delegate.get_daily_registration_stats(30)
+    # Get daily registration stats (last 30 days) - convert to JSON-serializable format
+    daily_stats_raw = Delegate.get_daily_registration_stats(30)
+    daily_stats = [{'date': str(row.date), 'count': row.count} for row in daily_stats_raw]
     
     # Recent payments
     recent_payments = Payment.query.filter_by(
