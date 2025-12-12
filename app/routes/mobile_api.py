@@ -169,55 +169,61 @@ def get_church_hierarchy():
 @mobile_api_bp.route('/auth/login', methods=['POST'])
 def mobile_login():
     """Login endpoint for mobile app"""
-    # Check if JWT is available first
-    if not HAS_JWT:
+    try:
+        # Check if JWT is available first
+        if not HAS_JWT:
+            return jsonify({
+                'success': False,
+                'error': 'Authentication service temporarily unavailable. Please try again later.'
+            }), 503
+        
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({'success': False, 'error': 'Email and password required'}), 400
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if not user or not user.check_password(password):
+            return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
+        
+        if not user.is_active:
+            return jsonify({'success': False, 'error': 'Account is deactivated'}), 401
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        # Generate token
+        token = generate_token(user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Login successful',
+            'token': token,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone if hasattr(user, 'phone') else None,
+                'role': user.role,
+                'local_church': user.local_church if hasattr(user, 'local_church') else None,
+                'parish': user.parish if hasattr(user, 'parish') else None,
+                'archdeaconry': user.archdeaconry if hasattr(user, 'archdeaconry') else None,
+                'profile_picture': user.profile_picture if hasattr(user, 'profile_picture') else None
+            }
+        })
+    except Exception as e:
         return jsonify({
             'success': False,
-            'error': 'Authentication service temporarily unavailable. Please try again later.'
-        }), 503
-    
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'success': False, 'error': 'No data provided'}), 400
-    
-    email = data.get('email')
-    password = data.get('password')
-    
-    if not email or not password:
-        return jsonify({'success': False, 'error': 'Email and password required'}), 400
-    
-    user = User.query.filter_by(email=email).first()
-    
-    if not user or not user.check_password(password):
-        return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
-    
-    if not user.is_active:
-        return jsonify({'success': False, 'error': 'Account is deactivated'}), 401
-    
-    # Update last login
-    user.last_login = datetime.utcnow()
-    db.session.commit()
-    
-    # Generate token
-    token = generate_token(user.id)
-    
-    return jsonify({
-        'success': True,
-        'message': 'Login successful',
-        'token': token,
-        'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'role': user.role,
-            'local_church': user.local_church,
-            'parish': user.parish,
-            'archdeaconry': user.archdeaconry,
-            'profile_picture': user.profile_picture
-        }
-    })
+            'error': f'Server error: {str(e)}'
+        }), 500
 
 
 @mobile_api_bp.route('/auth/register', methods=['POST'])
