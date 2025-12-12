@@ -73,25 +73,54 @@ class Delegate(db.Model):
         self.custom_field_values = json.dumps(values)
     
     @staticmethod
-    def generate_ticket_number(event=None):
-        """Generate a unique ticket number like KAYO-2025-XXXX"""
+    def generate_ticket_number(event=None, max_retries=10):
+        """
+        Generate a unique ticket number like KAYO-2025-XXXX.
+        Uses the highest existing number + 1 to avoid duplicates.
+        Includes retry logic for race conditions.
+        """
+        import random
         year = datetime.utcnow().year
-        # Get the count of delegates this year
-        query = Delegate.query.filter(
-            db.extract('year', Delegate.registered_at) == year
-        )
-        if event:
-            query = query.filter_by(event_id=event.id)
-        count = query.count() + 1
-        prefix = event.slug.upper() if event else 'KAYO'
-        return f"{prefix}-{year}-{count:04d}"
+        prefix = event.slug.upper() if event and event.slug else 'KAYO'
+        
+        for attempt in range(max_retries):
+            # Find the highest ticket number for this prefix and year
+            pattern = f"{prefix}-{year}-%"
+            
+            # Query to find the max number
+            existing = Delegate.query.filter(
+                Delegate.ticket_number.like(pattern)
+            ).order_by(Delegate.ticket_number.desc()).first()
+            
+            if existing and existing.ticket_number:
+                try:
+                    # Extract the number part (last segment after the last dash)
+                    last_num = int(existing.ticket_number.split('-')[-1])
+                    next_num = last_num + 1
+                except (ValueError, IndexError):
+                    next_num = 1
+            else:
+                next_num = 1
+            
+            # Add a small random offset on retries to avoid collisions
+            if attempt > 0:
+                next_num += random.randint(1, 10)
+            
+            ticket_number = f"{prefix}-{year}-{next_num:04d}"
+            
+            # Verify it doesn't already exist
+            if not Delegate.query.filter_by(ticket_number=ticket_number).first():
+                return ticket_number
+        
+        # Fallback: use timestamp-based unique number
+        import time
+        unique_suffix = int(time.time() * 1000) % 100000
+        return f"{prefix}-{year}-{unique_suffix:05d}"
     
     @staticmethod
     def get_next_delegate_number(event_id=None):
-        """Get next sequential delegate number"""
-        query = Delegate.query
-        if event_id:
-            query = query.filter_by(event_id=event_id)
+        """Get next sequential delegate number - guaranteed unique"""
+        # Find the max delegate number for this event
         max_num = db.session.query(db.func.max(Delegate.delegate_number)).filter(
             Delegate.event_id == event_id if event_id else True
         ).scalar()

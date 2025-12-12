@@ -795,12 +795,11 @@ def register_delegate(user):
             if existing:
                 return jsonify({'success': False, 'error': 'Phone number already registered for this event'}), 400
         
-        # Generate ticket number
-        ticket_number = Delegate.generate_ticket_number(event)
+        # Generate delegate number (sequential) - ticket number assigned on payment
         delegate_number = Delegate.get_next_delegate_number(event.id)
         
         delegate = Delegate(
-            ticket_number=ticket_number,
+            ticket_number=None,  # Ticket assigned only after payment verification
             delegate_number=delegate_number,
             name=data['name'],
             local_church=data['local_church'],
@@ -820,11 +819,12 @@ def register_delegate(user):
         
         return jsonify({
             'success': True,
-            'message': 'Delegate registered successfully',
+            'message': 'Delegate registered successfully. Ticket will be issued after payment verification.',
             'delegate': {
                 'id': delegate.id,
-                'ticket_number': delegate.ticket_number,
                 'delegate_number': delegate.delegate_number,
+                'ticket_number': None,
+                'ticket_status': 'Pending payment verification',
                 'name': delegate.name,
                 'is_paid': delegate.is_paid
             }
@@ -970,12 +970,11 @@ def bulk_upload_delegates(user):
                         skipped.append({'row': row_num, 'name': name, 'reason': f'Phone {phone_number} already registered'})
                         continue
                 
-                # Generate ticket number
-                ticket_number = Delegate.generate_ticket_number(event)
+                # Ticket will be assigned after payment verification
                 delegate_number = Delegate.get_next_delegate_number(event.id)
                 
                 delegate = Delegate(
-                    ticket_number=ticket_number,
+                    ticket_number=None,  # Ticket assigned only after payment verification
                     delegate_number=delegate_number,
                     name=name,
                     local_church=local_church,
@@ -990,7 +989,7 @@ def bulk_upload_delegates(user):
                 )
                 
                 db.session.add(delegate)
-                created.append({'row': row_num, 'name': name, 'ticket': ticket_number})
+                created.append({'row': row_num, 'name': name, 'ticket': 'Pending payment'})
                 
             except Exception as e:
                 errors.append({'row': row_num, 'error': str(e)})
@@ -1186,6 +1185,22 @@ def get_delegate_ticket(user, delegate_id):
         if not can_access:
             return jsonify({'success': False, 'error': error_msg}), 403
         
+        # Check if delegate has a ticket (payment verified)
+        if not delegate.ticket_number:
+            return jsonify({
+                'success': True,
+                'ticket': None,
+                'ticket_status': 'pending',
+                'message': 'Ticket will be issued after payment verification',
+                'delegate': {
+                    'id': delegate.id,
+                    'name': delegate.name,
+                    'is_paid': delegate.is_paid,
+                    'parish': delegate.parish,
+                    'archdeaconry': delegate.archdeaconry
+                }
+            })
+        
         # Get event info
         event_name = delegate.event.name if delegate.event else 'KAYO Event'
         event_venue = delegate.event.venue if delegate.event else ''
@@ -1211,6 +1226,7 @@ def get_delegate_ticket(user, delegate_id):
         
         return jsonify({
             'success': True,
+            'ticket_status': 'issued',
             'ticket': {
                 'ticket_number': delegate.ticket_number,
                 'delegate_number': delegate.delegate_number,
@@ -1262,11 +1278,13 @@ def get_my_delegate_tickets(user):
         
         tickets = []
         for d in delegates:
-            qr_data = f"KAYO|{d.ticket_number}|{d.name}|{d.phone_number or 'N/A'}"
+            # Only generate QR data if ticket is issued
+            qr_data = f"KAYO|{d.ticket_number}|{d.name}|{d.phone_number or 'N/A'}" if d.ticket_number else None
             
             tickets.append({
                 'id': d.id,
                 'ticket_number': d.ticket_number,
+                'ticket_status': 'issued' if d.ticket_number else 'pending',
                 'delegate_number': d.delegate_number,
                 'name': d.name,
                 'phone_number': d.phone_number,
@@ -1283,6 +1301,8 @@ def get_my_delegate_tickets(user):
         return jsonify({
             'success': True,
             'count': len(tickets),
+            'issued_count': sum(1 for t in tickets if t['ticket_status'] == 'issued'),
+            'pending_count': sum(1 for t in tickets if t['ticket_status'] == 'pending'),
             'tickets': tickets
         })
     except Exception as e:
@@ -1757,22 +1777,35 @@ def confirm_payment(user):
         if not delegates:
             return jsonify({'success': False, 'error': 'No delegates found'}), 404
         
-        # Mark delegates as paid
+        # Mark delegates as paid and assign ticket numbers
+        tickets_issued = []
         for delegate in delegates:
             delegate.is_paid = True
             delegate.payment_confirmed_by = user.id
             delegate.payment_confirmed_at = datetime.utcnow()
+            
+            # Generate and assign ticket number if not already assigned
+            if not delegate.ticket_number:
+                event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                tickets_issued.append({
+                    'delegate_id': delegate.id,
+                    'name': delegate.name,
+                    'ticket_number': delegate.ticket_number
+                })
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'Payment confirmed for {len(delegates)} delegate(s)',
+            'message': f'Payment confirmed for {len(delegates)} delegate(s). {len(tickets_issued)} ticket(s) issued.',
+            'tickets_issued': len(tickets_issued),
             'delegates': [{
                 'id': d.id,
                 'name': d.name,
                 'ticket_number': d.ticket_number,
-                'is_paid': d.is_paid
+                'is_paid': d.is_paid,
+                'ticket_just_issued': any(t['delegate_id'] == d.id for t in tickets_issued)
             } for d in delegates]
         })
     except Exception as e:
