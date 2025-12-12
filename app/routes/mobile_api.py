@@ -1365,6 +1365,313 @@ def register_device(user):
     })
 
 
+# ==================== PASSWORD RESET ENDPOINTS ====================
+
+# Store reset tokens temporarily (in production, use Redis or database)
+password_reset_tokens = {}
+
+@mobile_api_bp.route('/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """Request password reset - sends reset link via email"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+    
+    email = data.get('email', '').strip().lower()
+    
+    if not email:
+        return jsonify({'success': False, 'error': 'Email address is required'}), 400
+    
+    # Find user by email
+    user = User.query.filter_by(email=email).first()
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return jsonify({
+            'success': True,
+            'message': 'If an account with that email exists, a password reset link has been sent.'
+        })
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expiry = datetime.utcnow() + timedelta(hours=1)  # Token valid for 1 hour
+    
+    # Store token with user_id and expiry
+    password_reset_tokens[reset_token] = {
+        'user_id': user.id,
+        'expiry': expiry,
+        'email': email
+    }
+    
+    # TODO: Send email with reset link
+    # For now, we'll include the token in the response for testing
+    # In production, remove this and send via email
+    reset_url = f"{request.host_url}reset-password?token={reset_token}"
+    
+    # Try to send email (implement your email service here)
+    try:
+        # send_reset_email(user.email, reset_url)
+        pass
+    except Exception as e:
+        current_app.logger.error(f"Failed to send reset email: {e}")
+    
+    return jsonify({
+        'success': True,
+        'message': 'If an account with that email exists, a password reset link has been sent.',
+        # Remove this in production - only for testing
+        'debug_token': reset_token if current_app.debug else None
+    })
+
+
+@mobile_api_bp.route('/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using token"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+    
+    token = data.get('token')
+    new_password = data.get('new_password')
+    
+    if not token:
+        return jsonify({'success': False, 'error': 'Reset token is required'}), 400
+    
+    if not new_password:
+        return jsonify({'success': False, 'error': 'New password is required'}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'error': 'Password must be at least 6 characters'}), 400
+    
+    # Verify token
+    token_data = password_reset_tokens.get(token)
+    
+    if not token_data:
+        return jsonify({'success': False, 'error': 'Invalid or expired reset token'}), 400
+    
+    if datetime.utcnow() > token_data['expiry']:
+        # Remove expired token
+        del password_reset_tokens[token]
+        return jsonify({'success': False, 'error': 'Reset token has expired'}), 400
+    
+    # Get user and update password
+    user = User.query.get(token_data['user_id'])
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    
+    # Set new password
+    user.set_password(new_password)
+    db.session.commit()
+    
+    # Remove used token
+    del password_reset_tokens[token]
+    
+    return jsonify({
+        'success': True,
+        'message': 'Password has been reset successfully. You can now login with your new password.'
+    })
+
+
+@mobile_api_bp.route('/auth/change-password', methods=['POST'])
+@token_required
+def change_password(user):
+    """Change password for authenticated user"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+    
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password:
+        return jsonify({'success': False, 'error': 'Current password is required'}), 400
+    
+    if not new_password:
+        return jsonify({'success': False, 'error': 'New password is required'}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'error': 'Password must be at least 6 characters'}), 400
+    
+    # Verify current password
+    if not user.check_password(current_password):
+        return jsonify({'success': False, 'error': 'Current password is incorrect'}), 400
+    
+    # Set new password
+    user.set_password(new_password)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Password changed successfully'
+    })
+
+
+# ==================== API DOCUMENTATION ====================
+
+@mobile_api_bp.route('/docs', methods=['GET'])
+def api_documentation():
+    """Get API documentation with all available endpoints"""
+    base_url = request.host_url.rstrip('/') + '/api/v1'
+    
+    docs = {
+        'api_name': 'KAYO Mobile API',
+        'version': '1.0.0',
+        'base_url': base_url,
+        'description': 'Kenya Anglican Youth Organization Event Management API',
+        'authentication': {
+            'type': 'Bearer Token (JWT)',
+            'header': 'Authorization: Bearer <token>',
+            'note': 'Obtain token via /auth/login or /auth/register endpoints'
+        },
+        'endpoints': {
+            'status': {
+                'GET /status': 'Check API status and JWT availability',
+                'GET /health': 'API health check',
+                'GET /docs': 'This documentation'
+            },
+            'authentication': {
+                'POST /auth/login': {
+                    'description': 'Login with email/phone and password',
+                    'body': {'email_or_phone': 'string', 'password': 'string'},
+                    'returns': 'JWT token and user info'
+                },
+                'POST /auth/register': {
+                    'description': 'Register new user account',
+                    'body': {
+                        'name': 'string (required)',
+                        'email': 'string (required)',
+                        'phone': 'string (required)',
+                        'password': 'string (required)',
+                        'role': 'string (chair/minister)',
+                        'local_church': 'string',
+                        'parish': 'string',
+                        'archdeaconry': 'string'
+                    }
+                },
+                'POST /auth/google': {
+                    'description': 'Login/register with Google OAuth',
+                    'body': {'id_token': 'string (Google ID token)'}
+                },
+                'GET /auth/profile': 'Get current user profile (requires auth)',
+                'PUT /auth/profile': 'Update user profile (requires auth)',
+                'POST /auth/forgot-password': {
+                    'description': 'Request password reset email',
+                    'body': {'email': 'string'}
+                },
+                'POST /auth/reset-password': {
+                    'description': 'Reset password with token',
+                    'body': {'token': 'string', 'new_password': 'string'}
+                },
+                'POST /auth/change-password': {
+                    'description': 'Change password (requires auth)',
+                    'body': {'current_password': 'string', 'new_password': 'string'}
+                }
+            },
+            'church_data': {
+                'GET /church/archdeaconries': 'Get list of all archdeaconries',
+                'GET /church/parishes': 'Get parishes (optional: ?archdeaconry=name)',
+                'GET /church/local-churches': 'Get local churches (optional: ?parish=name)',
+                'GET /church/hierarchy': 'Get complete church hierarchy tree'
+            },
+            'events': {
+                'GET /events': 'List all events',
+                'GET /events/<id>': 'Get event details',
+                'GET /events/active': 'Get currently active event'
+            },
+            'delegates': {
+                'GET /delegates': {
+                    'description': 'List delegates (requires auth)',
+                    'query_params': {
+                        'page': 'int (default: 1)',
+                        'per_page': 'int (default: 50)',
+                        'is_paid': 'bool',
+                        'archdeaconry': 'string',
+                        'parish': 'string',
+                        'search': 'string'
+                    }
+                },
+                'POST /delegates': {
+                    'description': 'Register new delegate (requires auth)',
+                    'body': {
+                        'name': 'string (required)',
+                        'phone_number': 'string',
+                        'local_church': 'string (required)',
+                        'parish': 'string (required)',
+                        'archdeaconry': 'string (required)',
+                        'gender': 'string (Male/Female)',
+                        'category': 'string (Delegate/Observer/Guest)',
+                        'pricing_tier_id': 'int',
+                        'event_id': 'int'
+                    }
+                },
+                'GET /delegates/<id>': 'Get delegate details (requires auth)',
+                'PUT /delegates/<id>': 'Update delegate (requires auth)',
+                'DELETE /delegates/<id>': 'Delete delegate (requires auth)',
+                'POST /delegates/bulk-upload': {
+                    'description': 'Upload delegates via Excel file (requires auth)',
+                    'body': 'multipart/form-data with file field'
+                },
+                'GET /delegates/bulk-template': 'Download Excel template for bulk upload'
+            },
+            'checkin': {
+                'POST /checkin/scan': {
+                    'description': 'Check in delegate via QR scan (requires auth)',
+                    'body': {'qr_data': 'string', 'session_id': 'int (optional)'}
+                },
+                'POST /checkin/manual': {
+                    'description': 'Manual check-in (requires auth)',
+                    'body': {'search': 'string', 'delegate_id': 'int', 'session_id': 'int'}
+                }
+            },
+            'dashboard': {
+                'GET /dashboard/stats': 'Get dashboard statistics (requires auth)',
+                'GET /dashboard/recent-delegates': 'Get recently registered delegates (requires auth)'
+            },
+            'payments': {
+                'POST /payments/initiate': {
+                    'description': 'Initiate M-Pesa payment (requires auth)',
+                    'body': {'delegate_ids': '[int]', 'phone_number': 'string'}
+                },
+                'GET /payments/status/<id>': 'Check payment status (requires auth)',
+                'POST /payments/confirm': {
+                    'description': 'Confirm payment manually (Finance role only)',
+                    'body': {
+                        'delegate_ids': '[int]',
+                        'receipt_number': 'string',
+                        'payment_method': 'string (cash/mpesa/bank)',
+                        'amount': 'number'
+                    }
+                },
+                'GET /payments/pending-delegates': 'Get delegates with pending payments (Finance role)'
+            },
+            'notifications': {
+                'POST /notifications/register-device': {
+                    'description': 'Register device for push notifications',
+                    'body': {'fcm_token': 'string', 'device_type': 'string'}
+                }
+            }
+        },
+        'roles': {
+            'delegate_registration': ['chair', 'minister', 'admin', 'super_admin', 'clerk', 'registrar'],
+            'payment_confirmation': ['treasurer', 'finance', 'admin', 'super_admin', 'registrar'],
+            'bulk_upload': ['admin', 'super_admin', 'registrar', 'clerk']
+        },
+        'error_responses': {
+            '400': 'Bad Request - Invalid input data',
+            '401': 'Unauthorized - Invalid or missing token',
+            '403': 'Forbidden - Insufficient permissions',
+            '404': 'Not Found - Resource does not exist',
+            '500': 'Internal Server Error',
+            '503': 'Service Unavailable - JWT not installed'
+        }
+    }
+    
+    return jsonify(docs)
+
+
 # ==================== HEALTH CHECK ====================
 
 @mobile_api_bp.route('/health', methods=['GET'])
