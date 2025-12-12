@@ -434,7 +434,7 @@ def get_all_church_data():
 
 
 @mobile_api_bp.route('/church-data/<archdeaconry>/parishes', methods=['GET'])
-def get_parishes(archdeaconry):
+def api_get_archdeaconry_parishes(archdeaconry):
     """Get parishes for an archdeaconry"""
     if archdeaconry in CHURCH_DATA:
         return jsonify({
@@ -447,7 +447,7 @@ def get_parishes(archdeaconry):
 # ==================== EVENTS ENDPOINTS ====================
 
 @mobile_api_bp.route('/events', methods=['GET'])
-def get_events():
+def api_get_events():
     """Get all active events"""
     events = Event.query.filter_by(is_active=True, is_published=True).all()
     
@@ -470,7 +470,7 @@ def get_events():
 
 
 @mobile_api_bp.route('/events/<int:event_id>', methods=['GET'])
-def get_event(event_id):
+def api_get_event(event_id):
     """Get single event details"""
     event = Event.query.get_or_404(event_id)
     
