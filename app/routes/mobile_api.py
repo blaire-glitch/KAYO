@@ -31,6 +31,7 @@ from app.models.delegate import Delegate
 from app.models.payment import Payment
 from app.models.event import Event, PricingTier
 from app.models.operations import CheckInRecord
+from app.models.permission_request import PermissionRequest
 from app.church_data import CHURCH_DATA
 
 mobile_api_bp = Blueprint('mobile_api', __name__, url_prefix='/api/v1')
@@ -760,14 +761,33 @@ def get_user_delegate_scope_filter(user):
 @mobile_api_bp.route('/delegates', methods=['POST'])
 @token_required
 def register_delegate(user):
-    """Register a new delegate - only youth ministers and chairpersons"""
+    """Register a new delegate - only youth ministers and chairpersons, or users with approved permission"""
     try:
         # Check if user has permission to register delegates
-        if user.role not in DELEGATE_REGISTRATION_ROLES:
-            return jsonify({
-                'success': False, 
-                'error': 'Access denied. Only Youth Ministers and Chairpersons can register delegates.'
-            }), 403
+        has_role_permission = user.role in DELEGATE_REGISTRATION_ROLES
+        approved_permission = None
+        
+        if not has_role_permission:
+            # Check for approved permission request
+            approved_permission = PermissionRequest.get_approved_permission(user.id, 'delegate_registration')
+            
+            if not approved_permission:
+                # Check if they have a pending request
+                has_pending = PermissionRequest.has_pending_request(user.id, 'delegate_registration')
+                if has_pending:
+                    return jsonify({
+                        'success': False, 
+                        'error': 'Your permission request is still pending review. Please wait for approval.',
+                        'can_request_permission': False,
+                        'has_pending_request': True
+                    }), 403
+                else:
+                    return jsonify({
+                        'success': False, 
+                        'error': 'Access denied. You can request permission to register delegates.',
+                        'can_request_permission': True,
+                        'has_pending_request': False
+                    }), 403
         
         data = request.get_json()
         
@@ -778,6 +798,21 @@ def register_delegate(user):
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
+        
+        # If permission is from approved request, check scope
+        if approved_permission and approved_permission.scope:
+            if approved_permission.scope == 'parish':
+                if data['parish'] != approved_permission.scope_value:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Your permission only allows registering delegates from {approved_permission.scope_value} parish'
+                    }), 403
+            elif approved_permission.scope == 'archdeaconry':
+                if data['archdeaconry'] != approved_permission.scope_value:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Your permission only allows registering delegates from {approved_permission.scope_value} archdeaconry'
+                    }), 403
         
         # Get event
         event_id = data.get('event_id')
@@ -1883,6 +1918,284 @@ def register_device(user):
     })
 
 
+# ==================== PERMISSION REQUEST ENDPOINTS ====================
+
+# Roles that can approve permission requests
+PERMISSION_APPROVAL_ROLES = ['admin', 'super_admin', 'registrar']
+
+@mobile_api_bp.route('/permissions/request', methods=['POST'])
+@token_required
+def request_permission(user):
+    """
+    Request permission to add delegates.
+    Users who don't have delegate registration rights can request access.
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        permission_type = data.get('permission_type', 'delegate_registration')
+        reason = data.get('reason', '').strip()
+        scope = data.get('scope', 'parish')  # parish, archdeaconry, all
+        scope_value = data.get('scope_value', '').strip()
+        
+        # Check if user already has the permission
+        if user.role in DELEGATE_REGISTRATION_ROLES:
+            return jsonify({
+                'success': False,
+                'error': 'You already have permission to register delegates'
+            }), 400
+        
+        # Check if user already has a pending request
+        if PermissionRequest.has_pending_request(user.id, permission_type):
+            return jsonify({
+                'success': False,
+                'error': 'You already have a pending permission request. Please wait for it to be reviewed.'
+            }), 400
+        
+        # Check if user has an approved (non-expired) request
+        existing_approved = PermissionRequest.get_approved_permission(user.id, permission_type)
+        if existing_approved:
+            return jsonify({
+                'success': False,
+                'error': 'You already have an approved permission. Use it to register delegates.',
+                'permission': existing_approved.to_dict()
+            }), 400
+        
+        # Set scope value based on user's church if not provided
+        if not scope_value:
+            if scope == 'parish':
+                scope_value = user.parish
+            elif scope == 'archdeaconry':
+                scope_value = user.archdeaconry
+        
+        # Create permission request
+        permission_request = PermissionRequest(
+            user_id=user.id,
+            permission_type=permission_type,
+            reason=reason,
+            scope=scope,
+            scope_value=scope_value,
+            status='pending'
+        )
+        
+        db.session.add(permission_request)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Permission request submitted successfully. An admin will review it shortly.',
+            'request': permission_request.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to submit request: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/permissions/my-requests', methods=['GET'])
+@token_required
+def get_my_permission_requests(user):
+    """Get current user's permission requests"""
+    try:
+        status_filter = request.args.get('status')  # pending, approved, rejected, expired
+        
+        query = PermissionRequest.query.filter_by(user_id=user.id)
+        
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+        
+        requests = query.order_by(PermissionRequest.requested_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'requests': [r.to_dict() for r in requests],
+            'has_pending': any(r.status == 'pending' for r in requests),
+            'has_approved': any(r.status == 'approved' for r in requests)
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Failed to get requests: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/permissions/check', methods=['GET'])
+@token_required
+def check_permission_status(user):
+    """
+    Check if user can register delegates.
+    Returns both role-based and request-based permissions.
+    """
+    try:
+        permission_type = request.args.get('type', 'delegate_registration')
+        
+        # Check role-based permission
+        has_role_permission = user.role in DELEGATE_REGISTRATION_ROLES
+        
+        # Check approved request permission
+        approved_request = PermissionRequest.get_approved_permission(user.id, permission_type)
+        has_request_permission = approved_request is not None
+        
+        # Check pending request
+        has_pending = PermissionRequest.has_pending_request(user.id, permission_type)
+        
+        can_register = has_role_permission or has_request_permission
+        
+        response = {
+            'success': True,
+            'can_register_delegates': can_register,
+            'permission_source': 'role' if has_role_permission else ('request' if has_request_permission else None),
+            'has_role_permission': has_role_permission,
+            'has_request_permission': has_request_permission,
+            'has_pending_request': has_pending,
+            'user_role': user.role
+        }
+        
+        if approved_request:
+            response['approved_permission'] = {
+                'scope': approved_request.scope,
+                'scope_value': approved_request.scope_value,
+                'expires_at': approved_request.expires_at.isoformat() if approved_request.expires_at else None,
+                'approved_at': approved_request.reviewed_at.isoformat() if approved_request.reviewed_at else None
+            }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Failed to check permission: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/permissions/pending', methods=['GET'])
+@token_required
+def get_pending_permission_requests(user):
+    """Get all pending permission requests - Admin only"""
+    if user.role not in PERMISSION_APPROVAL_ROLES:
+        return jsonify({
+            'success': False,
+            'error': 'Access denied. Only admins can view permission requests.'
+        }), 403
+    
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status = request.args.get('status', 'pending')
+        
+        query = PermissionRequest.query
+        
+        if status != 'all':
+            query = query.filter_by(status=status)
+        
+        # Order by most recent first
+        requests = query.order_by(PermissionRequest.requested_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return jsonify({
+            'success': True,
+            'requests': [r.to_dict() for r in requests.items],
+            'total': requests.total,
+            'pages': requests.pages,
+            'current_page': requests.page,
+            'pending_count': PermissionRequest.get_pending_count()
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Failed to get requests: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/permissions/review/<int:request_id>', methods=['POST'])
+@token_required
+def review_permission_request(user, request_id):
+    """Approve or reject a permission request - Admin only"""
+    if user.role not in PERMISSION_APPROVAL_ROLES:
+        return jsonify({
+            'success': False,
+            'error': 'Access denied. Only admins can review permission requests.'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        action = data.get('action')  # approve or reject
+        reviewer_notes = data.get('notes', '').strip()
+        expires_days = data.get('expires_days')  # Optional: set expiry for approved permissions
+        
+        if action not in ['approve', 'reject']:
+            return jsonify({'success': False, 'error': 'Action must be "approve" or "reject"'}), 400
+        
+        # Get the permission request
+        perm_request = PermissionRequest.query.get(request_id)
+        
+        if not perm_request:
+            return jsonify({'success': False, 'error': 'Permission request not found'}), 404
+        
+        if perm_request.status != 'pending':
+            return jsonify({
+                'success': False,
+                'error': f'Request has already been {perm_request.status}'
+            }), 400
+        
+        # Update the request
+        perm_request.status = 'approved' if action == 'approve' else 'rejected'
+        perm_request.reviewed_at = datetime.utcnow()
+        perm_request.reviewed_by = user.id
+        perm_request.reviewer_notes = reviewer_notes
+        
+        # Set expiry if approved and days specified
+        if action == 'approve' and expires_days:
+            perm_request.expires_at = datetime.utcnow() + timedelta(days=expires_days)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Permission request {action}d successfully',
+            'request': perm_request.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to review request: {str(e)}'}), 500
+
+
+@mobile_api_bp.route('/permissions/cancel/<int:request_id>', methods=['POST'])
+@token_required
+def cancel_permission_request(user, request_id):
+    """Cancel own pending permission request"""
+    try:
+        perm_request = PermissionRequest.query.get(request_id)
+        
+        if not perm_request:
+            return jsonify({'success': False, 'error': 'Permission request not found'}), 404
+        
+        # Only the requester can cancel their own request
+        if perm_request.user_id != user.id:
+            return jsonify({'success': False, 'error': 'You can only cancel your own requests'}), 403
+        
+        if perm_request.status != 'pending':
+            return jsonify({
+                'success': False,
+                'error': f'Cannot cancel a request that has been {perm_request.status}'
+            }), 400
+        
+        # Delete the request
+        db.session.delete(perm_request)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Permission request cancelled successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to cancel request: {str(e)}'}), 500
+
+
 # ==================== PASSWORD RESET ENDPOINTS ====================
 
 # Store reset tokens temporarily (in production, use Redis or database)
@@ -2170,12 +2483,36 @@ def api_documentation():
                     'description': 'Register device for push notifications',
                     'body': {'fcm_token': 'string', 'device_type': 'string'}
                 }
+            },
+            'permissions': {
+                'POST /permissions/request': {
+                    'description': 'Request permission to add delegates',
+                    'body': {
+                        'permission_type': 'string (delegate_registration)',
+                        'reason': 'string (why you need permission)',
+                        'scope': 'string (parish/archdeaconry/all)',
+                        'scope_value': 'string (specific parish/archdeaconry name)'
+                    }
+                },
+                'GET /permissions/my-requests': 'Get your permission requests (requires auth)',
+                'GET /permissions/check': 'Check if you can register delegates (requires auth)',
+                'GET /permissions/pending': 'Get all pending requests (Admin only)',
+                'POST /permissions/review/<id>': {
+                    'description': 'Approve or reject a permission request (Admin only)',
+                    'body': {
+                        'action': 'string (approve/reject)',
+                        'notes': 'string (reviewer notes)',
+                        'expires_days': 'int (optional - days until permission expires)'
+                    }
+                },
+                'POST /permissions/cancel/<id>': 'Cancel your own pending request'
             }
         },
         'roles': {
             'delegate_registration': ['chair', 'minister', 'admin', 'super_admin', 'clerk', 'registrar'],
             'payment_confirmation': ['treasurer', 'finance', 'admin', 'super_admin', 'registrar'],
-            'bulk_upload': ['admin', 'super_admin', 'registrar', 'clerk']
+            'bulk_upload': ['admin', 'super_admin', 'registrar', 'clerk'],
+            'permission_approval': ['admin', 'super_admin', 'registrar']
         },
         'error_responses': {
             '400': 'Bad Request - Invalid input data',
