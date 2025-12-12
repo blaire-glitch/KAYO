@@ -46,8 +46,9 @@ def dashboard():
     # Get gender stats
     gender_stats = Delegate.get_gender_stats()
     
-    # Get category stats
-    category_stats = Delegate.get_category_stats()
+    # Get category stats - convert to JSON-serializable format
+    category_stats_raw = Delegate.get_category_stats()
+    category_stats = [{'category': row.category or 'Unknown', 'count': row.count} for row in category_stats_raw]
     
     # Get daily registration stats (last 30 days) - convert to JSON-serializable format
     daily_stats_raw = Delegate.get_daily_registration_stats(30)
