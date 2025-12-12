@@ -7,6 +7,7 @@ from app import db
 from app.models.user import User
 from app.models.delegate import Delegate
 from app.models.payment import Payment
+from app.models.operations import CheckInRecord
 from app.forms import AdminUserForm, SearchForm, CheckInForm
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -147,6 +148,35 @@ def all_users():
     )
     
     return render_template('admin/users.html', users=users)
+
+
+@admin_bp.route('/delegates/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_delegate(id):
+    """Delete a delegate from admin panel"""
+    delegate = Delegate.query.get_or_404(id)
+    
+    try:
+        delegate_name = delegate.name
+        ticket_number = delegate.ticket_number
+        
+        # Delete associated payments first
+        Payment.query.filter_by(delegate_id=id).delete()
+        
+        # Delete check-in records
+        CheckInRecord.query.filter_by(delegate_id=id).delete()
+        
+        # Delete the delegate
+        db.session.delete(delegate)
+        db.session.commit()
+        
+        flash(f'Delegate "{delegate_name}" ({ticket_number}) deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting delegate: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.all_delegates'))
 
 
 @admin_bp.route('/users/create', methods=['GET', 'POST'])
