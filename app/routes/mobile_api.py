@@ -698,7 +698,7 @@ def update_delegate(user, delegate_id):
 
 @mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['DELETE'])
 @token_required
-def delete_delegate(user, delegate_id):
+def api_delete_delegate(user, delegate_id):
     """Delete a delegate"""
     try:
         delegate = Delegate.query.get_or_404(delegate_id)
