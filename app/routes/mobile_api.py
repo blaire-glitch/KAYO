@@ -696,6 +696,44 @@ def update_delegate(user, delegate_id):
     })
 
 
+@mobile_api_bp.route('/delegates/<int:delegate_id>', methods=['DELETE'])
+@token_required
+def delete_delegate(user, delegate_id):
+    """Delete a delegate"""
+    try:
+        delegate = Delegate.query.get_or_404(delegate_id)
+        
+        # Check ownership or admin
+        if delegate.registered_by != user.id and not user.is_admin():
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        # Don't allow deleting checked-in delegates
+        if delegate.checked_in:
+            return jsonify({'success': False, 'error': 'Cannot delete a checked-in delegate'}), 400
+        
+        # Store info for response
+        delegate_name = delegate.name
+        ticket_number = delegate.ticket_number
+        
+        # Delete associated payments first (if any)
+        Payment.query.filter_by(delegate_id=delegate_id).delete()
+        
+        # Delete check-in records (if any)
+        CheckInRecord.query.filter_by(delegate_id=delegate_id).delete()
+        
+        # Delete the delegate
+        db.session.delete(delegate)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Delegate {delegate_name} ({ticket_number}) deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to delete: {str(e)}'}), 500
+
+
 # ==================== CHECK-IN ENDPOINTS ====================
 
 @mobile_api_bp.route('/checkin/scan', methods=['POST'])
