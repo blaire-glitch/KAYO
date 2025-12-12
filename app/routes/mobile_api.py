@@ -167,7 +167,7 @@ def api_get_church_hierarchy():
 
 # ==================== EVENT ENDPOINTS ====================
 @mobile_api_bp.route('/events/active', methods=['GET'])
-def get_active_event():
+def api_get_active_event():
     """Get current active event"""
     try:
         event = Event.query.filter_by(is_active=True).first()
