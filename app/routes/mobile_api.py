@@ -108,6 +108,63 @@ def api_status():
     })
 
 
+# ==================== CHURCH DATA ENDPOINTS ====================
+@mobile_api_bp.route('/church/archdeaconries', methods=['GET'])
+def get_archdeaconries():
+    """Get list of all archdeaconries"""
+    archdeaconries = sorted(CHURCH_DATA.keys())
+    return jsonify({
+        'success': True,
+        'archdeaconries': archdeaconries,
+        'count': len(archdeaconries)
+    })
+
+
+@mobile_api_bp.route('/church/parishes', methods=['GET'])
+def get_parishes():
+    """Get parishes, optionally filtered by archdeaconry"""
+    archdeaconry = request.args.get('archdeaconry')
+    
+    if archdeaconry:
+        if archdeaconry not in CHURCH_DATA:
+            return jsonify({
+                'success': False,
+                'error': f'Archdeaconry "{archdeaconry}" not found'
+            }), 404
+        parishes = sorted(CHURCH_DATA[archdeaconry])
+    else:
+        # Return all parishes
+        parishes = []
+        for arch_parishes in CHURCH_DATA.values():
+            parishes.extend(arch_parishes)
+        parishes = sorted(set(parishes))
+    
+    return jsonify({
+        'success': True,
+        'archdeaconry': archdeaconry,
+        'parishes': parishes,
+        'count': len(parishes)
+    })
+
+
+@mobile_api_bp.route('/church/hierarchy', methods=['GET'])
+def get_church_hierarchy():
+    """Get full church hierarchy (archdeaconries with their parishes)"""
+    hierarchy = []
+    for archdeaconry in sorted(CHURCH_DATA.keys()):
+        hierarchy.append({
+            'archdeaconry': archdeaconry,
+            'parishes': sorted(CHURCH_DATA[archdeaconry])
+        })
+    
+    return jsonify({
+        'success': True,
+        'hierarchy': hierarchy,
+        'archdeaconry_count': len(hierarchy),
+        'total_parishes': sum(len(item['parishes']) for item in hierarchy)
+    })
+
+
 # ==================== AUTHENTICATION ENDPOINTS ====================
 @mobile_api_bp.route('/auth/login', methods=['POST'])
 def mobile_login():
