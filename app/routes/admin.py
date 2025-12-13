@@ -219,26 +219,40 @@ def edit_user(id):
     form = AdminUserForm(obj=user)
     
     if form.validate_on_submit():
-        # Check if email changed and already exists
-        if form.email.data != user.email:
-            if User.query.filter_by(email=form.email.data).first():
-                flash('Email already registered.', 'danger')
-                return render_template('admin/user_form.html', form=form, action='Edit', user=user)
-        
-        user.name = form.name.data
-        user.email = form.email.data
-        user.phone = form.phone.data or None
-        user.role = form.role.data
-        user.local_church = form.local_church.data or None
-        user.parish = form.parish.data or None
-        user.archdeaconry = form.archdeaconry.data or None
-        
-        if form.password.data:
-            user.set_password(form.password.data)
-        
-        db.session.commit()
-        flash(f'User "{user.name}" updated successfully!', 'success')
-        return redirect(url_for('admin.all_users'))
+        try:
+            # Check if email changed and already exists
+            if form.email.data != user.email:
+                existing_user = User.query.filter_by(email=form.email.data).first()
+                if existing_user:
+                    flash('Email already registered.', 'danger')
+                    return render_template('admin/user_form.html', form=form, action='Edit', user=user)
+            
+            # Check if phone changed and already exists
+            if form.phone.data and form.phone.data != user.phone:
+                existing_phone = User.query.filter_by(phone=form.phone.data).first()
+                if existing_phone and existing_phone.id != user.id:
+                    flash('Phone number already registered.', 'danger')
+                    return render_template('admin/user_form.html', form=form, action='Edit', user=user)
+            
+            user.name = form.name.data
+            user.email = form.email.data
+            user.phone = form.phone.data or None
+            user.role = form.role.data
+            user.local_church = form.local_church.data or None
+            user.parish = form.parish.data or None
+            user.archdeaconry = form.archdeaconry.data or None
+            
+            if form.password.data:
+                user.set_password(form.password.data)
+            
+            db.session.commit()
+            flash(f'User "{user.name}" updated successfully!', 'success')
+            return redirect(url_for('admin.all_users'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'Error editing user {id}: {str(e)}')
+            flash(f'An error occurred while updating the user: {str(e)}', 'danger')
+            return render_template('admin/user_form.html', form=form, action='Edit', user=user)
     
     return render_template('admin/user_form.html', form=form, action='Edit', user=user)
 
