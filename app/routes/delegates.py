@@ -2,11 +2,45 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from app import db
 from app.models.delegate import Delegate
+from app.models.user import User
 from app.forms import DelegateForm, BulkRegistrationForm, SearchForm
 import csv
 import io
 
 delegates_bp = Blueprint('delegates', __name__, url_prefix='/delegates')
+
+
+def is_youth_minister():
+    """Check if current user is a youth minister"""
+    return current_user.role == 'youth_minister'
+
+
+def can_manage_delegate(delegate):
+    """
+    Check if current user can manage a delegate.
+    - Admins can manage all delegates
+    - Youth ministers can manage delegates from their archdeaconry
+    - Chairs can only manage their own delegates
+    """
+    # Admins have full access
+    if current_user.is_admin():
+        return True
+    
+    # Own delegates
+    if delegate.registered_by == current_user.id:
+        return True
+    
+    # Youth ministers can manage delegates from their archdeaconry
+    if is_youth_minister() and current_user.archdeaconry:
+        return delegate.archdeaconry == current_user.archdeaconry
+    
+    return False
+
+
+def get_archdeaconry_user_ids(archdeaconry):
+    """Get all user IDs (chairs) in a specific archdeaconry"""
+    users = User.query.filter_by(archdeaconry=archdeaconry).all()
+    return [u.id for u in users]
 
 
 @delegates_bp.route('/register', methods=['GET', 'POST'])
@@ -56,11 +90,21 @@ def list_delegates():
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
-    delegates = Delegate.query.filter_by(
-        registered_by=current_user.id
-    ).order_by(Delegate.registered_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # Youth ministers see all delegates from their archdeaconry
+    if is_youth_minister() and current_user.archdeaconry:
+        user_ids = get_archdeaconry_user_ids(current_user.archdeaconry)
+        delegates = Delegate.query.filter(
+            Delegate.registered_by.in_(user_ids)
+        ).order_by(Delegate.registered_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        # Regular users see only their own delegates
+        delegates = Delegate.query.filter_by(
+            registered_by=current_user.id
+        ).order_by(Delegate.registered_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     return render_template('delegates/list.html', delegates=delegates)
 
@@ -70,8 +114,8 @@ def list_delegates():
 def view_delegate(id):
     delegate = Delegate.query.get_or_404(id)
     
-    # Only allow viewing own delegates (unless admin)
-    if delegate.registered_by != current_user.id and not current_user.is_admin():
+    # Check permission using helper function
+    if not can_manage_delegate(delegate):
         flash('You do not have permission to view this delegate.', 'danger')
         return redirect(url_for('delegates.list_delegates'))
     
@@ -83,8 +127,8 @@ def view_delegate(id):
 def edit_delegate(id):
     delegate = Delegate.query.get_or_404(id)
     
-    # Only allow editing own delegates (unless admin)
-    if delegate.registered_by != current_user.id and not current_user.is_admin():
+    # Check permission using helper function
+    if not can_manage_delegate(delegate):
         flash('You do not have permission to edit this delegate.', 'danger')
         return redirect(url_for('delegates.list_delegates'))
     
@@ -126,8 +170,8 @@ def edit_delegate(id):
 def delete_delegate(id):
     delegate = Delegate.query.get_or_404(id)
     
-    # Only allow deleting own delegates (unless admin)
-    if delegate.registered_by != current_user.id and not current_user.is_admin():
+    # Check permission using helper function
+    if not can_manage_delegate(delegate):
         flash('You do not have permission to delete this delegate.', 'danger')
         return redirect(url_for('delegates.list_delegates'))
     
@@ -149,8 +193,8 @@ def view_ticket(id):
     """View delegate ticket with QR code"""
     delegate = Delegate.query.get_or_404(id)
     
-    # Only allow viewing own delegates (unless admin)
-    if delegate.registered_by != current_user.id and not current_user.is_admin():
+    # Check permission using helper function
+    if not can_manage_delegate(delegate):
         flash('You do not have permission to view this ticket.', 'danger')
         return redirect(url_for('delegates.list_delegates'))
     
@@ -164,8 +208,8 @@ def print_badge(id):
     """Print delegate badge"""
     delegate = Delegate.query.get_or_404(id)
     
-    # Only allow viewing own delegates (unless admin)
-    if delegate.registered_by != current_user.id and not current_user.is_admin():
+    # Check permission using helper function
+    if not can_manage_delegate(delegate):
         flash('You do not have permission to print this badge.', 'danger')
         return redirect(url_for('delegates.list_delegates'))
     
