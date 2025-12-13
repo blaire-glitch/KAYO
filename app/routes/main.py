@@ -23,6 +23,13 @@ def index():
     return redirect(url_for('auth.login'))
 
 
+@main_bp.route('/app')
+@login_required
+def app_home():
+    """Masked URL endpoint - redirects to dashboard"""
+    return redirect(url_for('main.dashboard'))
+
+
 @main_bp.route('/dashboard')
 @login_required
 def dashboard():

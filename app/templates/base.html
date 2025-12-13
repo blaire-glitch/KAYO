@@ -724,6 +724,169 @@
                 });
             });
         }
+        
+        // URL Masking - Single Page Navigation
+        (function() {
+            const APP_BASE = '/app';
+            
+            // Replace browser URL without reloading
+            if (window.location.pathname !== '/' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+                // Replace current URL with masked URL (keep same page loaded)
+                window.history.replaceState({}, document.title, APP_BASE);
+            }
+            
+            // Intercept all internal link clicks
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('a');
+                if (!link) return;
+                
+                const href = link.getAttribute('href');
+                
+                // Skip external links, anchors, and special links
+                if (!href || 
+                    href.startsWith('http') || 
+                    href.startsWith('#') || 
+                    href.startsWith('javascript:') ||
+                    href.startsWith('mailto:') ||
+                    href.startsWith('tel:') ||
+                    link.hasAttribute('download') ||
+                    link.getAttribute('target') === '_blank' ||
+                    link.classList.contains('no-mask')) {
+                    return;
+                }
+                
+                // Let logout work normally
+                if (href.includes('/logout')) {
+                    return;
+                }
+                
+                e.preventDefault();
+                loadPage(href);
+            });
+            
+            // Intercept form submissions
+            document.addEventListener('submit', function(e) {
+                const form = e.target;
+                
+                // Skip forms that should work normally
+                if (form.classList.contains('no-mask') || 
+                    form.getAttribute('target') === '_blank' ||
+                    form.getAttribute('enctype') === 'multipart/form-data') {
+                    return;
+                }
+                
+                e.preventDefault();
+                
+                const formData = new FormData(form);
+                const method = form.method.toUpperCase() || 'POST';
+                const action = form.action || window.location.href;
+                
+                loadPage(action, {
+                    method: method,
+                    body: method === 'GET' ? null : formData
+                });
+            });
+            
+            // Load page via AJAX
+            function loadPage(url, options = {}) {
+                // Show loading indicator
+                const main = document.querySelector('main.main-content');
+                if (main) {
+                    main.style.opacity = '0.5';
+                    main.style.pointerEvents = 'none';
+                }
+                
+                const fetchOptions = {
+                    method: options.method || 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                };
+                
+                if (options.body) {
+                    fetchOptions.body = options.body;
+                }
+                
+                fetch(url, fetchOptions)
+                    .then(response => {
+                        if (response.redirected) {
+                            // Handle redirects
+                            return fetch(response.url, {
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                credentials: 'same-origin'
+                            }).then(r => r.text());
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        // Parse the response
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        // Update main content
+                        const newMain = doc.querySelector('main.main-content');
+                        const currentMain = document.querySelector('main.main-content');
+                        
+                        if (newMain && currentMain) {
+                            currentMain.innerHTML = newMain.innerHTML;
+                            currentMain.style.opacity = '1';
+                            currentMain.style.pointerEvents = 'auto';
+                        }
+                        
+                        // Update page title
+                        const newTitle = doc.querySelector('title');
+                        if (newTitle) {
+                            document.title = newTitle.textContent;
+                        }
+                        
+                        // Update active sidebar links
+                        updateActiveSidebarLinks(url);
+                        
+                        // Execute any inline scripts in the new content
+                        const scripts = currentMain.querySelectorAll('script');
+                        scripts.forEach(script => {
+                            const newScript = document.createElement('script');
+                            if (script.src) {
+                                newScript.src = script.src;
+                            } else {
+                                newScript.textContent = script.textContent;
+                            }
+                            script.parentNode.replaceChild(newScript, script);
+                        });
+                        
+                        // Scroll to top
+                        window.scrollTo(0, 0);
+                        
+                        // Keep URL masked
+                        window.history.replaceState({}, document.title, APP_BASE);
+                    })
+                    .catch(error => {
+                        console.error('Navigation error:', error);
+                        // Fallback to normal navigation
+                        window.location.href = url;
+                    });
+            }
+            
+            // Update sidebar active state
+            function updateActiveSidebarLinks(currentUrl) {
+                const sidebar = document.getElementById('sidebar');
+                if (!sidebar) return;
+                
+                sidebar.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('active');
+                    const href = link.getAttribute('href');
+                    if (href && currentUrl.includes(href)) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+            
+            // Handle browser back/forward (just reload since URLs are masked)
+            window.addEventListener('popstate', function() {
+                window.location.reload();
+            });
+        })();
     </script>
     
     {% block extra_js %}{% endblock %}
