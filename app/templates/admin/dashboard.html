@@ -2,11 +2,130 @@
 
 {% block title %}Admin Dashboard - KAYO{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Role-Based Theme Colors */
+    :root {
+        --super-admin-gold: #FFD700;
+        --super-admin-bg: #1a1a2e;
+        --super-admin-glow: rgba(255, 215, 0, 0.4);
+        
+        --admin-green: #1a5f2a;
+        --admin-gold: #D4AF37;
+    }
+    
+    /* Welcome Card Base */
+    .welcome-card {
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .welcome-card .role-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .welcome-card h2 {
+        margin: 12px 0 8px;
+        font-weight: 700;
+    }
+    
+    .welcome-card .access-level {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    /* Super Admin - Premium Gold Theme */
+    .welcome-card.super-admin {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+        color: white;
+        border: 2px solid var(--super-admin-gold);
+        box-shadow: 0 0 30px var(--super-admin-glow), inset 0 0 60px rgba(255, 215, 0, 0.05);
+        animation: superAdminGlow 3s ease-in-out infinite;
+    }
+    
+    @keyframes superAdminGlow {
+        0%, 100% { box-shadow: 0 0 30px var(--super-admin-glow), inset 0 0 60px rgba(255, 215, 0, 0.05); }
+        50% { box-shadow: 0 0 50px var(--super-admin-glow), inset 0 0 80px rgba(255, 215, 0, 0.1); }
+    }
+    
+    .welcome-card.super-admin .role-badge {
+        background: linear-gradient(135deg, var(--super-admin-gold), #FFA500);
+        color: #1a1a2e;
+    }
+    
+    .welcome-card.super-admin h2 {
+        background: linear-gradient(90deg, var(--super-admin-gold), #FFA500);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .welcome-card.super-admin::before {
+        content: '⚡';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 3rem;
+        opacity: 0.3;
+    }
+    
+    /* Admin - Green with Gold */
+    .welcome-card.admin {
+        background: linear-gradient(135deg, var(--admin-green) 0%, #0d4a1c 100%);
+        color: white;
+        border-left: 4px solid var(--admin-gold);
+    }
+    
+    .welcome-card.admin .role-badge {
+        background: var(--admin-gold);
+        color: #1a1a2e;
+    }
+    
+    .welcome-card.admin::before {
+        content: '🛡️';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 mt-3">
+<!-- Role-Based Welcome Card -->
+{% set role_class = current_user.role | replace('_', '-') %}
+<div class="welcome-card {{ role_class }}">
+    <span class="role-badge">
+        {% if current_user.role == 'super_admin' %}
+            ⚡ Super Admin
+        {% else %}
+            🛡️ Administrator
+        {% endif %}
+    </span>
+    <h2>Welcome back, {{ current_user.name }}!</h2>
+    <p class="access-level mb-0">
+        {% if current_user.role == 'super_admin' %}
+            Full system access • All permissions granted • KAYO Diocese of Nambale
+        {% else %}
+            Event administration • System management • KAYO Diocese of Nambale
+        {% endif %}
+    </p>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2><i class="bi bi-speedometer2 me-2"></i>Admin Dashboard</h2>
-        <p class="text-muted mb-0">Overview of all registrations and payments</p>
+        <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Admin Dashboard</h4>
+        <p class="text-muted mb-0 small">Overview of all registrations and payments</p>
     </div>
     <div class="btn-group">
         <a href="{{ url_for('admin.search') }}" class="btn btn-outline-primary">

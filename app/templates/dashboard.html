@@ -2,11 +2,338 @@
 
 {% block title %}Dashboard - KAYO | ACK Diocese of Nambale{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Role-Based Theme Colors */
+    :root {
+        --super-admin-gold: #FFD700;
+        --super-admin-bg: #1a1a2e;
+        --super-admin-glow: rgba(255, 215, 0, 0.4);
+        
+        --admin-green: #1a5f2a;
+        --admin-gold: #D4AF37;
+        
+        --youth-minister-blue: #0EA5E9;
+        --youth-minister-bg: #E0F2FE;
+        
+        --chair-yellow: #FBBF24;
+        --chair-green: #22C55E;
+        
+        --finance-green: #059669;
+        --finance-gold: #EAB308;
+        
+        --reg-officer-green: #1a5f2a;
+        --reg-officer-purple: #7C3AED;
+        
+        --data-clerk-green: #1a5f2a;
+        --data-clerk-teal: #0D9488;
+        
+        --viewer-gray: #6B7280;
+    }
+    
+    /* Welcome Card Base */
+    .welcome-card {
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .welcome-card .role-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .welcome-card h2 {
+        margin: 12px 0 8px;
+        font-weight: 700;
+    }
+    
+    .welcome-card .access-level {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    /* Super Admin - Premium Gold Theme */
+    .welcome-card.super-admin {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+        color: white;
+        border: 2px solid var(--super-admin-gold);
+        box-shadow: 0 0 30px var(--super-admin-glow), inset 0 0 60px rgba(255, 215, 0, 0.05);
+        animation: superAdminGlow 3s ease-in-out infinite;
+    }
+    
+    @keyframes superAdminGlow {
+        0%, 100% { box-shadow: 0 0 30px var(--super-admin-glow), inset 0 0 60px rgba(255, 215, 0, 0.05); }
+        50% { box-shadow: 0 0 50px var(--super-admin-glow), inset 0 0 80px rgba(255, 215, 0, 0.1); }
+    }
+    
+    .welcome-card.super-admin .role-badge {
+        background: linear-gradient(135deg, var(--super-admin-gold), #FFA500);
+        color: #1a1a2e;
+    }
+    
+    .welcome-card.super-admin h2 {
+        background: linear-gradient(90deg, var(--super-admin-gold), #FFA500);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .welcome-card.super-admin::before {
+        content: '⚡';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 3rem;
+        opacity: 0.3;
+    }
+    
+    /* Admin - Green with Gold */
+    .welcome-card.admin {
+        background: linear-gradient(135deg, var(--admin-green) 0%, #0d4a1c 100%);
+        color: white;
+        border-left: 4px solid var(--admin-gold);
+    }
+    
+    .welcome-card.admin .role-badge {
+        background: var(--admin-gold);
+        color: #1a1a2e;
+    }
+    
+    .welcome-card.admin::before {
+        content: '🛡️';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+    
+    /* Youth Minister - Sky Blue */
+    .welcome-card.youth-minister {
+        background: linear-gradient(135deg, var(--youth-minister-bg) 0%, #BAE6FD 100%);
+        color: #0369A1;
+        border-left: 4px solid var(--youth-minister-blue);
+    }
+    
+    .welcome-card.youth-minister .role-badge {
+        background: var(--youth-minister-blue);
+        color: white;
+    }
+    
+    .welcome-card.youth-minister::before {
+        content: '☁️';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.4;
+    }
+    
+    .welcome-card.youth-minister::after {
+        content: '✨';
+        position: absolute;
+        right: 60px;
+        top: 40px;
+        font-size: 1.5rem;
+        opacity: 0.3;
+    }
+    
+    /* Chair - Yellow to Green */
+    .welcome-card.chair {
+        background: linear-gradient(135deg, #FEF3C7 0%, #D9F99D 100%);
+        color: #15803D;
+        border-left: 4px solid var(--chair-yellow);
+    }
+    
+    .welcome-card.chair .role-badge {
+        background: linear-gradient(135deg, var(--chair-yellow), var(--chair-green));
+        color: white;
+    }
+    
+    .welcome-card.chair::before {
+        content: '☀️';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.4;
+    }
+    
+    /* Finance - Green with Gold Glow */
+    .welcome-card.finance {
+        background: linear-gradient(135deg, #065F46 0%, #047857 100%);
+        color: white;
+        border-left: 4px solid var(--finance-gold);
+        animation: financeGlow 2s ease-in-out infinite;
+    }
+    
+    @keyframes financeGlow {
+        0%, 100% { box-shadow: 0 4px 20px rgba(234, 179, 8, 0.2); }
+        50% { box-shadow: 0 4px 30px rgba(234, 179, 8, 0.4); }
+    }
+    
+    .welcome-card.finance .role-badge {
+        background: var(--finance-gold);
+        color: #1a1a2e;
+    }
+    
+    .welcome-card.finance::before {
+        content: '💰';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.4;
+    }
+    
+    /* Registration Officer - Green with Purple */
+    .welcome-card.registration-officer {
+        background: linear-gradient(135deg, var(--reg-officer-green) 0%, #166534 100%);
+        color: white;
+        border-left: 4px solid var(--reg-officer-purple);
+    }
+    
+    .welcome-card.registration-officer .role-badge {
+        background: var(--reg-officer-purple);
+        color: white;
+    }
+    
+    .welcome-card.registration-officer::before {
+        content: '📋';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+    
+    /* Data Clerk - Green with Teal */
+    .welcome-card.data-clerk {
+        background: linear-gradient(135deg, #134E4A 0%, #0F766E 100%);
+        color: white;
+        border-left: 4px solid var(--data-clerk-teal);
+    }
+    
+    .welcome-card.data-clerk .role-badge {
+        background: var(--data-clerk-teal);
+        color: white;
+    }
+    
+    .welcome-card.data-clerk::before {
+        content: '📊';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+    
+    /* Viewer - Neutral Gray */
+    .welcome-card.viewer {
+        background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+        color: #374151;
+        border-left: 4px solid var(--viewer-gray);
+    }
+    
+    .welcome-card.viewer .role-badge {
+        background: var(--viewer-gray);
+        color: white;
+    }
+    
+    .welcome-card.viewer::before {
+        content: '👁️';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+    
+    /* Default User */
+    .welcome-card.user {
+        background: linear-gradient(135deg, var(--admin-green) 0%, #2d8f42 100%);
+        color: white;
+        border-left: 4px solid #22C55E;
+    }
+    
+    .welcome-card.user .role-badge {
+        background: #22C55E;
+        color: white;
+    }
+    
+    .welcome-card.user::before {
+        content: '👤';
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 mt-3">
+<!-- Role-Based Welcome Card -->
+{% set role_class = current_user.role | replace('_', '-') %}
+<div class="welcome-card {{ role_class }}">
+    <span class="role-badge">
+        {% if current_user.role == 'super_admin' %}
+            ⚡ Super Admin
+        {% elif current_user.role == 'admin' %}
+            🛡️ Administrator
+        {% elif current_user.role == 'youth_minister' %}
+            ✨ Youth Minister
+        {% elif current_user.role == 'chair' %}
+            🪑 Chair
+        {% elif current_user.role == 'finance' %}
+            💰 Finance
+        {% elif current_user.role == 'registration_officer' %}
+            📋 Registration Officer
+        {% elif current_user.role == 'data_clerk' %}
+            📊 Data Clerk
+        {% elif current_user.role == 'viewer' %}
+            👁️ Viewer
+        {% else %}
+            👤 Member
+        {% endif %}
+    </span>
+    <h2>Welcome back, {{ current_user.name }}!</h2>
+    <p class="access-level mb-0">
+        {% if current_user.role == 'super_admin' %}
+            Full system access • All permissions granted
+        {% elif current_user.role == 'admin' %}
+            Event administration • System management
+        {% elif current_user.role == 'youth_minister' %}
+            {% if current_user.archdeaconry %}Archdeaconry: {{ current_user.archdeaconry }}{% endif %}
+            {% if current_user.parish %} • Parish: {{ current_user.parish }}{% endif %}
+        {% elif current_user.role == 'chair' %}
+            {% if current_user.parish %}Parish: {{ current_user.parish }}{% endif %}
+            {% if current_user.local_church %} • {{ current_user.local_church }}{% endif %}
+        {% elif current_user.role == 'finance' %}
+            Financial operations • Payment management
+        {% elif current_user.role == 'registration_officer' %}
+            Delegate registration • Check-in management
+        {% elif current_user.role == 'data_clerk' %}
+            Data entry • Delegate records
+        {% elif current_user.role == 'viewer' %}
+            Read-only access
+        {% else %}
+            KAYO - ACK Diocese of Nambale
+        {% endif %}
+    </p>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2><i class="bi bi-speedometer2 me-2"></i>Dashboard</h2>
-        <p class="text-muted mb-0">Welcome back, {{ current_user.name }}! <span class="text-primary">| KAYO - ACK Diocese of Nambale</span></p>
+        <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
     </div>
     <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
         <i class="bi bi-person-plus me-2"></i>Register Delegate
