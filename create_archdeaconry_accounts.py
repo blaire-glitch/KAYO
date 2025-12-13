@@ -1,6 +1,6 @@
 """
 Script to create Youth Minister accounts for all Archdeaconries.
-Email format: archdeaconryname@kayo.com (lowercase, no spaces)
+Email format: archdeaconryname.ym@kayo.com (lowercase, no spaces)
 Password format: archdeaconryname123
 
 Run this once:
@@ -29,7 +29,8 @@ def create_archdeaconry_accounts():
             arch_name_clean = archdeaconry.replace(" Archdeaconry", "").replace("'s", "").replace(".", "")
             arch_name_clean = arch_name_clean.replace(" ", "").replace("-", "").lower()
             
-            email = f"{arch_name_clean}@kayo.com"
+            # Use .ym suffix to distinguish from parish accounts
+            email = f"{arch_name_clean}.ym@kayo.com"
             password = f"{arch_name_clean}123"
             
             # Check if user already exists
@@ -65,16 +66,16 @@ def create_archdeaconry_accounts():
         
         # Print summary table
         print("\n📋 ARCHDEACONRY YOUTH MINISTER ACCOUNT SUMMARY")
-        print("=" * 60)
-        print(f"{'Archdeaconry':<30} {'Email':<20} {'Password':<15}")
-        print("-" * 60)
+        print("=" * 70)
+        print(f"{'Archdeaconry':<30} {'Email':<25} {'Password':<15}")
+        print("-" * 70)
         
         for archdeaconry in sorted(CHURCH_DATA.keys()):
             arch_name_clean = archdeaconry.replace(" Archdeaconry", "").replace("'s", "").replace(".", "")
             arch_name_clean = arch_name_clean.replace(" ", "").replace("-", "").lower()
-            email = f"{arch_name_clean}@kayo.com"
+            email = f"{arch_name_clean}.ym@kayo.com"
             password = f"{arch_name_clean}123"
-            print(f"{archdeaconry:<30} {email:<20} {password:<15}")
+            print(f"{archdeaconry:<30} {email:<25} {password:<15}")
 
 
 if __name__ == '__main__':
