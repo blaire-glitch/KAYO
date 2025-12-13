@@ -72,7 +72,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 15px;
             margin-bottom: 15px;
             position: relative;
             z-index: 1;
@@ -81,11 +80,23 @@
         .logo-container img {
             height: 130px;
             filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
-            transition: all 0.4s ease;
             cursor: pointer;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+                filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+            }
+            50% {
+                transform: translateY(-10px);
+                filter: drop-shadow(0 15px 25px rgba(0,0,0,0.3));
+            }
         }
         
         .logo-container img:hover {
+            animation-play-state: paused;
             transform: scale(1.1) translateY(-5px);
             filter: drop-shadow(0 12px 20px rgba(0,0,0,0.3));
         }
@@ -300,7 +311,7 @@
             }
             
             .logo-container img {
-                height: 55px;
+                height: 80px;
             }
             
             .brand-name {
@@ -369,7 +380,6 @@
             <!-- Header -->
             <div class="login-header">
                 <div class="logo-container">
-                    <img src="{{ url_for('static', filename='images/diocese_logo.png') }}" alt="ACK Diocese" onerror="this.style.display='none'">
                     <img src="{{ url_for('static', filename='images/logo.png') }}" alt="KAYO" onerror="this.style.display='none'">
                 </div>
                 <h1 class="brand-name">KAYO</h1>
