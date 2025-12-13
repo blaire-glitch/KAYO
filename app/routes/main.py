@@ -1,9 +1,19 @@
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template, redirect, url_for, send_from_directory, current_app
 from flask_login import login_required, current_user
 from app.models.delegate import Delegate
 from app.models.payment import Payment
+import os
 
 main_bp = Blueprint('main', __name__)
+
+
+@main_bp.route('/favicon.ico')
+def favicon():
+    return send_from_directory(
+        os.path.join(current_app.root_path, 'static', 'images'),
+        'logo.png',
+        mimetype='image/png'
+    )
 
 
 @main_bp.route('/')
