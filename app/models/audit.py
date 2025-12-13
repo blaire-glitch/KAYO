@@ -192,6 +192,27 @@ class Role(db.Model):
                     'reports.view'
                 ],
                 'is_system': True
+            },
+            {
+                'name': 'chair',
+                'description': 'Church Chair - can register delegates from their church',
+                'permissions': [
+                    'delegates.view', 'delegates.create', 'delegates.edit',
+                    'payments.view', 'payments.process',
+                    'check_in.view'
+                ],
+                'is_system': True
+            },
+            {
+                'name': 'youth_minister',
+                'description': 'Youth Minister - can register and manage delegates',
+                'permissions': [
+                    'delegates.view', 'delegates.create', 'delegates.edit',
+                    'payments.view', 'payments.process',
+                    'check_in.view',
+                    'reports.view'
+                ],
+                'is_system': True
             }
         ]
         

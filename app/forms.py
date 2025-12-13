@@ -6,6 +6,27 @@ from app.models.user import User
 from app.church_data import get_archdeaconries, get_parishes, CHURCH_DATA
 
 
+def get_role_choices(include_admin=False, include_all=False):
+    """Get role choices from database"""
+    from app.models.audit import Role
+    
+    if include_all:
+        # For admin form - show all roles
+        roles = Role.query.order_by(Role.name).all()
+        choices = [(role.name, role.name.replace('_', ' ').title()) for role in roles]
+    elif include_admin:
+        # Include admin roles
+        roles = Role.query.filter(Role.name.in_(['chair', 'youth_minister', 'admin', 'data_clerk', 'registration_officer'])).all()
+        choices = [(role.name, role.name.replace('_', ' ').title()) for role in roles]
+    else:
+        # For self-registration - only basic roles
+        choices = [
+            ('chair', 'Chair'),
+            ('youth_minister', 'Youth Minister'),
+        ]
+    return choices
+
+
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
@@ -85,11 +106,7 @@ class AdminUserForm(FlaskForm):
     name = StringField('Full Name', validators=[DataRequired(), Length(min=2, max=100)])
     email = StringField('Email', validators=[DataRequired(), Email()])
     phone = StringField('Phone Number', validators=[Optional(), Length(min=10, max=15)])
-    role = SelectField('Role', choices=[
-        ('chair', 'Chair'),
-        ('youth_minister', 'Youth Minister'),
-        ('admin', 'Admin'),
-    ], validators=[DataRequired()])
+    role = SelectField('Role', validators=[DataRequired()])
     local_church = StringField('Local Church', validators=[Optional(), Length(max=100)])
     archdeaconry = SelectField('Archdeaconry', validators=[Optional()])
     parish = SelectField('Parish', validators=[Optional()])
@@ -100,6 +117,8 @@ class AdminUserForm(FlaskForm):
         super(AdminUserForm, self).__init__(*args, **kwargs)
         self.archdeaconry.choices = get_archdeaconries()
         self.parish.choices = get_parishes()
+        # Load roles from database
+        self.role.choices = get_role_choices(include_all=True)
 
 
 class BulkRegistrationForm(FlaskForm):
