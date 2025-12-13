@@ -27,9 +27,16 @@ def login():
             
             # Update last login
             user.last_login = datetime.utcnow()
+            
+            # Generate new session token (invalidates other sessions)
+            token = user.generate_session_token()
             db.session.commit()
             
             login_user(user)
+            
+            # Store session token in browser session
+            session['session_token'] = token
+            
             next_page = request.args.get('next')
             flash(f'Welcome back, {user.name}!', 'success')
             return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
@@ -218,10 +225,15 @@ def google_callback():
             flash('Your account has been deactivated. Please contact admin.', 'danger')
             return redirect(url_for('auth.login'))
         
+        # Generate new session token (invalidates other sessions)
+        token = user.generate_session_token()
         db.session.commit()
         
         # Log in user
         login_user(user)
+        
+        # Store session token in browser session
+        session['session_token'] = token
         
         # Check if user needs to complete profile
         if not user.local_church or not user.parish:

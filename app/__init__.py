@@ -1,6 +1,6 @@
-from flask import Flask
+from flask import Flask, session, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from config import Config
 
@@ -57,5 +57,17 @@ def create_app(config_class=Config):
     app.register_blueprint(badges_bp)
     app.register_blueprint(checkin_bp)
     app.register_blueprint(mobile_api_bp)
+    
+    # Custom unauthorized handler for session invalidation
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        from flask import redirect, url_for, request
+        # Check if this was a session invalidation (logged in elsewhere)
+        if session.get('session_token') and not current_user.is_authenticated:
+            session.clear()
+            flash('You have been logged out because your account was accessed from another device.', 'warning')
+        else:
+            flash('Please log in to access this page.', 'info')
+        return redirect(url_for('auth.login', next=request.url))
 
     return app

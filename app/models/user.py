@@ -1,6 +1,8 @@
 from datetime import datetime
+import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+from flask import session
 from app import db, login_manager
 
 
@@ -21,6 +23,9 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
+    
+    # Session management - for single session restriction
+    session_token = db.Column(db.String(64), nullable=True)
     
     # Google OAuth fields
     google_id = db.Column(db.String(100), unique=True, nullable=True)
@@ -43,6 +48,15 @@ class User(UserMixin, db.Model):
         if not self.password_hash:
             return False  # OAuth users without password
         return check_password_hash(self.password_hash, password)
+    
+    def generate_session_token(self):
+        """Generate a new session token for single-session enforcement"""
+        self.session_token = secrets.token_hex(32)
+        return self.session_token
+    
+    def verify_session_token(self, token):
+        """Verify if the provided session token matches"""
+        return self.session_token == token
     
     def is_admin(self):
         return self.role == 'admin' or self.role == 'super_admin'
@@ -105,4 +119,12 @@ class User(UserMixin, db.Model):
 
 @login_manager.user_loader
 def load_user(id):
-    return User.query.get(int(id))
+    user = User.query.get(int(id))
+    if user:
+        # Verify session token for single-session enforcement
+        stored_token = session.get('session_token')
+        if stored_token and user.session_token:
+            if stored_token != user.session_token:
+                # Session was invalidated (user logged in elsewhere)
+                return None
+    return user
