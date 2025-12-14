@@ -20,7 +20,8 @@ def add_new_roles():
                 'permissions': [
                     'delegates.view', 'delegates.create', 'delegates.edit',
                     'payments.view', 'payments.process',
-                    'check_in.view'
+                    'check_in.view',
+                    'funds.view', 'funds.create', 'funds.transfer'
                 ],
                 'is_system': True
             },
@@ -31,7 +32,18 @@ def add_new_roles():
                     'delegates.view', 'delegates.create', 'delegates.edit',
                     'payments.view', 'payments.process',
                     'check_in.view',
-                    'reports.view'
+                    'reports.view',
+                    'funds.view', 'funds.create', 'funds.approve', 'funds.transfer'
+                ],
+                'is_system': True
+            },
+            {
+                'name': 'finance',
+                'description': 'Finance Officer - manages fund confirmations and approvals',
+                'permissions': [
+                    'payments.view', 'payments.process', 'payments.approve',
+                    'reports.view', 'reports.export',
+                    'funds.view', 'funds.approve', 'funds.complete', 'funds.reports'
                 ],
                 'is_system': True
             }

@@ -43,6 +43,7 @@ def create_app(config_class=Config):
     from app.routes.badges import badges_bp
     from app.routes.checkin import checkin_bp
     from app.routes.mobile_api import mobile_api_bp
+    from app.routes.fund_management import bp as fund_management_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -57,6 +58,7 @@ def create_app(config_class=Config):
     app.register_blueprint(badges_bp)
     app.register_blueprint(checkin_bp)
     app.register_blueprint(mobile_api_bp)
+    app.register_blueprint(fund_management_bp)
     
     # Custom unauthorized handler for session invalidation
     @login_manager.unauthorized_handler

@@ -166,3 +166,129 @@ class CheckInForm(FlaskForm):
     ticket_number = StringField('Ticket Number', validators=[DataRequired()],
                                render_kw={"placeholder": "Scan or enter ticket number"})
     submit = SubmitField('Check In')
+
+
+# ============== FUND MANAGEMENT FORMS ==============
+
+class PledgeForm(FlaskForm):
+    """Form for recording pledges from delegates, well-wishers, or fundraising"""
+    source_type = SelectField('Source Type', choices=[
+        ('delegate', 'Delegate'),
+        ('well_wisher', 'Well Wisher'),
+        ('fundraising', 'Fundraising')
+    ], validators=[DataRequired()])
+    source_name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
+    source_phone = StringField('Phone Number', validators=[Optional(), Length(max=15)])
+    source_email = StringField('Email', validators=[Optional(), Email()])
+    delegate_id = SelectField('Link to Delegate (Optional)', coerce=int, validators=[Optional()])
+    amount_pledged = StringField('Amount Pledged (KSh)', validators=[DataRequired()])
+    due_date = StringField('Due Date (Optional)', validators=[Optional()])
+    local_church = StringField('Local Church', validators=[Optional(), Length(max=100)])
+    archdeaconry = SelectField('Archdeaconry', validators=[Optional()])
+    parish = SelectField('Parish', validators=[Optional()])
+    description = TextAreaField('Description/Purpose', validators=[Optional()])
+    submit = SubmitField('Record Pledge')
+    
+    def __init__(self, *args, **kwargs):
+        super(PledgeForm, self).__init__(*args, **kwargs)
+        self.archdeaconry.choices = [('', 'Select Archdeaconry')] + get_archdeaconries()[1:]
+        self.parish.choices = [('', 'Select Parish')] + get_parishes()[1:]
+        self.delegate_id.choices = [(0, 'Not linked to delegate')]
+
+
+class PledgePaymentForm(FlaskForm):
+    """Form for recording payments against a pledge"""
+    amount = StringField('Amount (KSh)', validators=[DataRequired()])
+    payment_method = SelectField('Payment Method', choices=[
+        ('mpesa', 'M-Pesa'),
+        ('cash', 'Cash'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('cheque', 'Cheque')
+    ], validators=[DataRequired()])
+    reference = StringField('Transaction Reference', validators=[Optional(), Length(max=100)])
+    notes = TextAreaField('Notes', validators=[Optional()])
+    submit = SubmitField('Record Payment')
+
+
+class ScheduledPaymentForm(FlaskForm):
+    """Form for creating scheduled/recurring payments"""
+    source_type = SelectField('Source Type', choices=[
+        ('delegate', 'Delegate'),
+        ('well_wisher', 'Well Wisher'),
+        ('fundraising', 'Fundraising')
+    ], validators=[DataRequired()])
+    source_name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
+    source_phone = StringField('Phone Number', validators=[Optional(), Length(max=15)])
+    source_email = StringField('Email', validators=[Optional(), Email()])
+    delegate_id = SelectField('Link to Delegate (Optional)', coerce=int, validators=[Optional()])
+    amount = StringField('Amount per Payment (KSh)', validators=[DataRequired()])
+    frequency = SelectField('Payment Frequency', choices=[
+        ('once', 'One-time'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly')
+    ], validators=[DataRequired()])
+    start_date = StringField('Start Date', validators=[DataRequired()])
+    end_date = StringField('End Date (Optional)', validators=[Optional()])
+    local_church = StringField('Local Church', validators=[Optional(), Length(max=100)])
+    archdeaconry = SelectField('Archdeaconry', validators=[Optional()])
+    parish = SelectField('Parish', validators=[Optional()])
+    description = TextAreaField('Description/Purpose', validators=[Optional()])
+    submit = SubmitField('Create Schedule')
+    
+    def __init__(self, *args, **kwargs):
+        super(ScheduledPaymentForm, self).__init__(*args, **kwargs)
+        self.archdeaconry.choices = [('', 'Select Archdeaconry')] + get_archdeaconries()[1:]
+        self.parish.choices = [('', 'Select Parish')] + get_parishes()[1:]
+        self.delegate_id.choices = [(0, 'Not linked to delegate')]
+
+
+class InstallmentPaymentForm(FlaskForm):
+    """Form for recording installment payments"""
+    amount_paid = StringField('Amount Paid (KSh)', validators=[DataRequired()])
+    payment_method = SelectField('Payment Method', choices=[
+        ('mpesa', 'M-Pesa'),
+        ('cash', 'Cash'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('cheque', 'Cheque')
+    ], validators=[DataRequired()])
+    reference = StringField('Transaction Reference', validators=[Optional(), Length(max=100)])
+    submit = SubmitField('Record Payment')
+
+
+class FundTransferForm(FlaskForm):
+    """Form for initiating fund transfers"""
+    amount = StringField('Amount to Transfer (KSh)', validators=[DataRequired()])
+    to_user_id = SelectField('Transfer To', coerce=int, validators=[DataRequired()])
+    description = TextAreaField('Description/Notes', validators=[Optional()])
+    submit = SubmitField('Initiate Transfer')
+    
+    def __init__(self, *args, **kwargs):
+        super(FundTransferForm, self).__init__(*args, **kwargs)
+        self.to_user_id.choices = [(0, 'Select Recipient')]
+
+
+class FundTransferApprovalForm(FlaskForm):
+    """Form for approving/rejecting fund transfers"""
+    action = SelectField('Action', choices=[
+        ('approve', 'Approve Transfer'),
+        ('reject', 'Reject Transfer')
+    ], validators=[DataRequired()])
+    notes = TextAreaField('Notes/Reason', validators=[Optional()])
+    submit = SubmitField('Submit')
+
+
+class FundTransferCompleteForm(FlaskForm):
+    """Form for marking fund transfer as completed"""
+    notes = TextAreaField('Confirmation Notes', validators=[Optional()])
+    submit = SubmitField('Confirm Receipt & Complete')
+
+
+class PaymentConfirmationForm(FlaskForm):
+    """Form for confirming payments"""
+    action = SelectField('Action', choices=[
+        ('confirm', 'Confirm Payment'),
+        ('reject', 'Reject Payment')
+    ], validators=[DataRequired()])
+    notes = TextAreaField('Notes', validators=[Optional()])
+    submit = SubmitField('Submit')
+
