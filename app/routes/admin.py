@@ -251,7 +251,13 @@ def edit_user(id):
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f'Error editing user {id}: {str(e)}')
-            flash(f'An error occurred while updating the user: {str(e)}', 'danger')
+            error_message = str(e).lower()
+            if 'unique constraint' in error_message and 'phone' in error_message:
+                flash('Phone number already registered by another user.', 'danger')
+            elif 'unique constraint' in error_message and 'email' in error_message:
+                flash('Email already registered by another user.', 'danger')
+            else:
+                flash(f'An error occurred while updating the user: {str(e)}', 'danger')
             return render_template('admin/user_form.html', form=form, action='Edit', user=user)
     
     return render_template('admin/user_form.html', form=form, action='Edit', user=user)
