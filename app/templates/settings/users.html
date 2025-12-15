@@ -35,7 +35,7 @@
                             <td>{{ user.email }}</td>
                             <td>
                                 {% if user.id != current_user.id and current_user.is_super_admin() %}
-                                <form method="POST" action="{{ url_for('settings.assign_role', user_id=user.id) }}" class="d-flex">
+                                <form method="POST" action="{{ url_for('settings.assign_role', user_id=user.id) }}" class="d-flex no-mask">
                                     <select name="role_id" class="form-select form-select-sm" 
                                             onchange="this.form.submit()" style="width: auto;">
                                         <option value="">No Role</option>
@@ -75,7 +75,7 @@
                             </td>
                             <td>
                                 {% if user.id != current_user.id and current_user.is_super_admin() %}
-                                <form method="POST" action="{{ url_for('settings.toggle_user_active', user_id=user.id) }}" class="d-inline">
+                                <form method="POST" action="{{ url_for('settings.toggle_user_active', user_id=user.id) }}" class="d-inline no-mask">
                                     <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if user.is_active else 'success' }}"
                                             title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
                                         <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>

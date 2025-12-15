@@ -18,7 +18,7 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-body p-4">
-                <form method="POST" action="{{ url_for('delegates.register_delegate') }}">
+                <form method="POST" class="no-mask" action="{{ url_for('delegates.register_delegate') }}">
                     {{ form.hidden_tag() }}
                     
                     <h6 class="text-muted mb-3">Personal Information</h6>
