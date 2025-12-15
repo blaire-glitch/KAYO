@@ -6,6 +6,11 @@ from app.models.user import User
 from app.church_data import get_archdeaconries, get_parishes, CHURCH_DATA
 
 
+class EmptyForm(FlaskForm):
+    """Empty form for CSRF protection only (e.g., delete/cancel buttons)"""
+    pass
+
+
 def get_role_choices(include_admin=False, include_all=False):
     """Get role choices from database"""
     from app.models.audit import Role

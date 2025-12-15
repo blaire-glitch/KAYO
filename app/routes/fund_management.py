@@ -15,7 +15,8 @@ from app.models import (
 )
 from app.forms import (
     PledgeForm, PledgePaymentForm, ScheduledPaymentForm, InstallmentPaymentForm,
-    FundTransferForm, FundTransferApprovalForm, FundTransferCompleteForm, PaymentConfirmationForm
+    FundTransferForm, FundTransferApprovalForm, FundTransferCompleteForm, PaymentConfirmationForm,
+    EmptyForm
 )
 from functools import wraps
 
@@ -258,7 +259,8 @@ def view_pledge(pledge_id):
     
     payments = pledge.payments.order_by(PledgePayment.created_at.desc()).all()
     today = date.today()
-    return render_template('fund_management/pledge_view.html', pledge=pledge, payments=payments, today=today)
+    form = EmptyForm()  # For CSRF token in cancel form
+    return render_template('fund_management/pledge_view.html', pledge=pledge, payments=payments, today=today, form=form)
 
 
 @bp.route('/pledges/<int:pledge_id>/payment', methods=['GET', 'POST'])
