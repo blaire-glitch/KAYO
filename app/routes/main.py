@@ -24,7 +24,7 @@ def index():
     return redirect(url_for('auth.login'))
 
 
-@main_bp.route('/app')
+@main_bp.route('/app', methods=['GET', 'POST'])
 @login_required
 def app_home():
     """Masked URL endpoint - redirects to dashboard"""
