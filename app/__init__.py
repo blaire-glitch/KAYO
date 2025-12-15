@@ -63,6 +63,10 @@ def create_app(config_class=Config):
     app.register_blueprint(mobile_api_bp)
     app.register_blueprint(fund_management_bp)
     
+    # Exempt API blueprints from CSRF (they use JWT authentication instead)
+    csrf.exempt(api_bp)
+    csrf.exempt(mobile_api_bp)
+    
     # Import all models to ensure they are registered with SQLAlchemy
     from app.models import user, delegate, event, payment, audit, permission_request, fund_management, operations
     
