@@ -70,6 +70,12 @@ def create_app(config_class=Config):
     # Import all models to ensure they are registered with SQLAlchemy
     from app.models import user, delegate, event, payment, audit, permission_request, fund_management, operations
     
+    # Make csrf_token() available in all templates
+    @app.context_processor
+    def inject_csrf_token():
+        from flask_wtf.csrf import generate_csrf
+        return dict(csrf_token=generate_csrf)
+    
     # Custom unauthorized handler for session invalidation
     @login_manager.unauthorized_handler
     def unauthorized():

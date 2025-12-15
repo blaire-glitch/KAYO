@@ -6,6 +6,8 @@
     <meta name="theme-color" content="#1a5f2a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- CSRF Token for AJAX and form submissions -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}KAYO{% endblock %}</title>
     
     <!-- Bootstrap 5 CSS -->
@@ -923,6 +925,24 @@
     </script>
     
     {% block extra_js %}{% endblock %}
+    
+    <!-- Auto-inject CSRF token into all POST forms -->
+    <script>
+        (function() {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            if (csrfToken) {
+                document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+                    if (!form.querySelector('input[name="csrf_token"]')) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'csrf_token';
+                        input.value = csrfToken;
+                        form.appendChild(input);
+                    }
+                });
+            }
+        })();
+    </script>
     
     <!-- Footer -->
     <footer class="text-center py-4 mt-4">
