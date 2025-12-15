@@ -257,7 +257,8 @@ def view_pledge(pledge_id):
         return redirect(url_for('fund_management.list_pledges'))
     
     payments = pledge.payments.order_by(PledgePayment.created_at.desc()).all()
-    return render_template('fund_management/pledge_view.html', pledge=pledge, payments=payments)
+    today = date.today()
+    return render_template('fund_management/pledge_view.html', pledge=pledge, payments=payments, today=today)
 
 
 @bp.route('/pledges/<int:pledge_id>/payment', methods=['GET', 'POST'])
