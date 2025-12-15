@@ -202,6 +202,13 @@ def create_pledge():
     delegates = Delegate.query.filter_by(registered_by=current_user.id).all()
     form.delegate_id.choices = [(0, 'Not linked to delegate')] + [(d.id, f"{d.name} ({d.ticket_number})") for d in delegates]
     
+    if request.method == 'POST':
+        if not form.validate():
+            # Show form errors as flash messages
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f'{field}: {error}', 'danger')
+    
     if form.validate_on_submit():
         try:
             pledge = Pledge(

@@ -184,8 +184,8 @@ class PledgeForm(FlaskForm):
     amount_pledged = StringField('Amount Pledged (KSh)', validators=[DataRequired()])
     due_date = StringField('Due Date (Optional)', validators=[Optional()])
     local_church = StringField('Local Church', validators=[Optional(), Length(max=100)])
-    archdeaconry = SelectField('Archdeaconry', validators=[Optional()])
-    parish = SelectField('Parish', validators=[Optional()])
+    archdeaconry = SelectField('Archdeaconry', validators=[Optional()], validate_choice=False)
+    parish = SelectField('Parish', validators=[Optional()], validate_choice=False)
     description = TextAreaField('Description/Purpose', validators=[Optional()])
     submit = SubmitField('Record Pledge')
     
@@ -230,8 +230,8 @@ class ScheduledPaymentForm(FlaskForm):
     start_date = StringField('Start Date', validators=[DataRequired()])
     end_date = StringField('End Date (Optional)', validators=[Optional()])
     local_church = StringField('Local Church', validators=[Optional(), Length(max=100)])
-    archdeaconry = SelectField('Archdeaconry', validators=[Optional()])
-    parish = SelectField('Parish', validators=[Optional()])
+    archdeaconry = SelectField('Archdeaconry', validators=[Optional()], validate_choice=False)
+    parish = SelectField('Parish', validators=[Optional()], validate_choice=False)
     description = TextAreaField('Description/Purpose', validators=[Optional()])
     submit = SubmitField('Create Schedule')
     
