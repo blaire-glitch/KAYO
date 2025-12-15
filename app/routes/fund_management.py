@@ -203,37 +203,44 @@ def create_pledge():
     form.delegate_id.choices = [(0, 'Not linked to delegate')] + [(d.id, f"{d.name} ({d.ticket_number})") for d in delegates]
     
     if request.method == 'POST':
-        if not form.validate():
+        # Debug: log form submission
+        print(f"POST received. Form data: {request.form}")
+        print(f"Form validates: {form.validate()}")
+        if form.errors:
+            print(f"Form errors: {form.errors}")
             # Show form errors as flash messages
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f'{field}: {error}', 'danger')
-    
-    if form.validate_on_submit():
-        try:
-            pledge = Pledge(
-                source_type=form.source_type.data,
-                source_name=form.source_name.data,
-                source_phone=form.source_phone.data,
-                source_email=form.source_email.data,
-                delegate_id=form.delegate_id.data if form.delegate_id.data != 0 else None,
-                amount_pledged=float(form.amount_pledged.data.replace(',', '')),
-                due_date=datetime.strptime(form.due_date.data, '%Y-%m-%d').date() if form.due_date.data else None,
-                local_church=form.local_church.data or current_user.local_church,
-                archdeaconry=form.archdeaconry.data or current_user.archdeaconry,
-                parish=form.parish.data or current_user.parish,
-                description=form.description.data,
-                recorded_by=current_user.id,
-                event_id=current_user.current_event_id
-            )
-            db.session.add(pledge)
-            db.session.commit()
-            
-            flash(f'Pledge of KSh {pledge.amount_pledged:,.2f} from {pledge.source_name} recorded successfully!', 'success')
-            return redirect(url_for('fund_management.view_pledge', pledge_id=pledge.id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error recording pledge: {str(e)}', 'error')
+        
+        if form.validate_on_submit():
+            try:
+                pledge = Pledge(
+                    source_type=form.source_type.data,
+                    source_name=form.source_name.data,
+                    source_phone=form.source_phone.data,
+                    source_email=form.source_email.data,
+                    delegate_id=form.delegate_id.data if form.delegate_id.data != 0 else None,
+                    amount_pledged=float(form.amount_pledged.data.replace(',', '')),
+                    due_date=datetime.strptime(form.due_date.data, '%Y-%m-%d').date() if form.due_date.data else None,
+                    local_church=form.local_church.data or current_user.local_church,
+                    archdeaconry=form.archdeaconry.data or current_user.archdeaconry,
+                    parish=form.parish.data or current_user.parish,
+                    description=form.description.data,
+                    recorded_by=current_user.id,
+                    event_id=current_user.current_event_id
+                )
+                db.session.add(pledge)
+                db.session.commit()
+                
+                flash(f'Pledge of KSh {pledge.amount_pledged:,.2f} from {pledge.source_name} recorded successfully!', 'success')
+                return redirect(url_for('fund_management.view_pledge', pledge_id=pledge.id))
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error creating pledge: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                flash(f'Error recording pledge: {str(e)}', 'danger')
     
     return render_template('fund_management/pledge_form.html', form=form, title='Record New Pledge')
 
