@@ -58,29 +58,65 @@
         {% if unpaid_delegates %}
         <div class="card">
             <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-phone me-2"></i>M-Pesa Payment</h5>
+                <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Process Payment</h5>
             </div>
             <div class="card-body p-4">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-2"></i>
-                    Enter your M-Pesa phone number below. You will receive an STK push prompt on your phone to complete the payment.
-                </div>
-                
                 <form method="POST" class="no-mask" action="{{ url_for('payments.initiate_payment') }}">
                     {{ form.hidden_tag() }}
                     
+                    <!-- Payment Method Selection -->
                     <div class="mb-4">
-                        <label class="form-label">{{ form.phone_number.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.phone_number(class="form-control form-control-lg", placeholder="e.g., 0712345678") }}
-                        <small class="text-muted">Enter the phone number registered with M-Pesa</small>
+                        <label class="form-label fw-semibold">{{ form.payment_method.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.payment_method(class="form-select form-select-lg", id="paymentMethod") }}
+                    </div>
+                    
+                    <!-- M-Pesa Phone Number (shown for mpesa and mpesa_paybill) -->
+                    <div class="mb-4" id="phoneGroup">
+                        <label class="form-label">{{ form.phone_number.label.text }}</label>
+                        {{ form.phone_number(class="form-control form-control-lg", placeholder="e.g., 0712345678", id="phoneNumber") }}
+                        <small class="text-muted" id="phoneHelp">Enter the phone number registered with M-Pesa</small>
                         {% for error in form.phone_number.errors %}
                         <div class="text-danger small">{{ error }}</div>
                         {% endfor %}
                     </div>
                     
+                    <!-- Receipt/Reference Number (shown for manual payments) -->
+                    <div class="mb-4" id="receiptGroup" style="display: none;">
+                        <label class="form-label">{{ form.receipt_number.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.receipt_number(class="form-control form-control-lg", placeholder="e.g., QJK2ABC345", id="receiptNumber") }}
+                        <small class="text-muted" id="receiptHelp">Enter the transaction reference number</small>
+                        {% for error in form.receipt_number.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Payment method info alerts -->
+                    <div class="alert alert-info mb-4" id="mpesaAlert">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>M-Pesa STK Push:</strong> You will receive a prompt on your phone to enter your M-Pesa PIN.
+                    </div>
+                    
+                    <div class="alert alert-warning mb-4" id="cashAlert" style="display: none;">
+                        <i class="bi bi-cash me-2"></i>
+                        <strong>Cash Payment:</strong> Only authorized Finance personnel can confirm cash payments.
+                        {% if not can_confirm_cash %}
+                        <br><small class="text-danger">You are not authorized to confirm cash payments.</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="alert alert-info mb-4" id="paybillAlert" style="display: none;">
+                        <i class="bi bi-phone me-2"></i>
+                        <strong>M-Pesa Paybill:</strong> Enter the M-Pesa confirmation code after paying via paybill.
+                    </div>
+                    
+                    <div class="alert alert-info mb-4" id="bankAlert" style="display: none;">
+                        <i class="bi bi-bank me-2"></i>
+                        <strong>Bank Transfer:</strong> Enter the bank transaction reference after completing the transfer.
+                    </div>
+                    
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-credit-card me-2"></i>Pay KSh {{ total_amount | int }} via M-Pesa
+                        <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
+                            <i class="bi bi-credit-card me-2"></i>Pay KSh {{ total_amount | int }}
                         </button>
                     </div>
                 </form>
@@ -121,6 +157,7 @@
                     <div>
                         <small class="text-muted">{{ payment.created_at.strftime('%d %b, %H:%M') }}</small><br>
                         KSh {{ payment.amount | int }}
+                        <small class="text-muted">({{ payment.payment_mode or 'M-Pesa' }})</small>
                     </div>
                     <span class="badge bg-{{ 'success' if payment.status == 'completed' else 'warning' if payment.status == 'pending' else 'danger' }}">
                         {{ payment.status | capitalize }}
@@ -130,6 +167,83 @@
             </ul>
         </div>
         {% endif %}
+        
+        {% if can_confirm_cash %}
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6><i class="bi bi-cash me-2"></i>Finance Options</h6>
+                <hr>
+                <a href="{{ url_for('payments.confirm_cash_payment') }}" class="btn btn-outline-success btn-sm w-100">
+                    <i class="bi bi-check-circle me-1"></i>Confirm Cash Payments
+                </a>
+                <small class="text-muted d-block mt-2">Confirm cash payments for any delegates</small>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var paymentMethod = document.getElementById('paymentMethod');
+    var phoneGroup = document.getElementById('phoneGroup');
+    var receiptGroup = document.getElementById('receiptGroup');
+    var phoneNumber = document.getElementById('phoneNumber');
+    var receiptNumber = document.getElementById('receiptNumber');
+    var submitBtn = document.getElementById('submitBtn');
+    
+    var mpesaAlert = document.getElementById('mpesaAlert');
+    var cashAlert = document.getElementById('cashAlert');
+    var paybillAlert = document.getElementById('paybillAlert');
+    var bankAlert = document.getElementById('bankAlert');
+    
+    var canConfirmCash = {{ 'true' if can_confirm_cash else 'false' }};
+    
+    function updateUI() {
+        var method = paymentMethod.value;
+        
+        // Hide all alerts first
+        mpesaAlert.style.display = 'none';
+        cashAlert.style.display = 'none';
+        paybillAlert.style.display = 'none';
+        bankAlert.style.display = 'none';
+        
+        // Reset required attributes
+        phoneNumber.required = false;
+        receiptNumber.required = false;
+        
+        if (method === 'mpesa') {
+            phoneGroup.style.display = 'block';
+            receiptGroup.style.display = 'none';
+            mpesaAlert.style.display = 'block';
+            phoneNumber.required = true;
+            submitBtn.innerHTML = '<i class="bi bi-phone me-2"></i>Pay via M-Pesa STK Push';
+            submitBtn.disabled = false;
+        } else if (method === 'cash') {
+            phoneGroup.style.display = 'none';
+            receiptGroup.style.display = 'none';
+            cashAlert.style.display = 'block';
+            submitBtn.innerHTML = '<i class="bi bi-cash me-2"></i>Confirm Cash Payment';
+            submitBtn.disabled = !canConfirmCash;
+        } else if (method === 'mpesa_paybill') {
+            phoneGroup.style.display = 'block';
+            receiptGroup.style.display = 'block';
+            paybillAlert.style.display = 'block';
+            receiptNumber.required = true;
+            submitBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Confirm Paybill Payment';
+            submitBtn.disabled = false;
+        } else if (method === 'bank_transfer') {
+            phoneGroup.style.display = 'none';
+            receiptGroup.style.display = 'block';
+            bankAlert.style.display = 'block';
+            receiptNumber.required = true;
+            submitBtn.innerHTML = '<i class="bi bi-bank me-2"></i>Confirm Bank Transfer';
+            submitBtn.disabled = false;
+        }
+    }
+    
+    paymentMethod.addEventListener('change', updateUI);
+    updateUI(); // Initial call
+});
+</script>
 {% endblock %}

@@ -1,12 +1,17 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app
 from flask_login import login_required, current_user
+from datetime import datetime
 from app import db
 from app.models.delegate import Delegate
 from app.models.payment import Payment
-from app.forms import PaymentForm
+from app.models.event import Event
+from app.forms import PaymentForm, CashPaymentForm
 from app.services.mpesa import MpesaAPI
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
+
+# Roles allowed to confirm cash payments
+PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin', 'registrar']
 
 
 @payments_bp.route('/')
@@ -24,12 +29,15 @@ def payment_page():
         return redirect(url_for('main.dashboard'))
     
     # Calculate total
-    delegate_fee = current_app.config['DELEGATE_FEE']
+    delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     total_amount = len(unpaid_delegates) * delegate_fee
     
     form = PaymentForm()
     if current_user.phone:
         form.phone_number.data = current_user.phone
+    
+    # Check if user can confirm cash payments
+    can_confirm_cash = current_user.role in PAYMENT_CONFIRMATION_ROLES
     
     # Get recent payment attempts
     recent_payments = Payment.query.filter_by(
@@ -41,19 +49,22 @@ def payment_page():
         unpaid_delegates=unpaid_delegates,
         total_amount=total_amount,
         delegate_fee=delegate_fee,
-        recent_payments=recent_payments
+        recent_payments=recent_payments,
+        can_confirm_cash=can_confirm_cash
     )
 
 
 @payments_bp.route('/initiate', methods=['POST'])
 @login_required
 def initiate_payment():
-    """Initiate M-Pesa STK Push payment"""
+    """Initiate payment based on selected method"""
     form = PaymentForm()
     
     if not form.validate_on_submit():
-        flash('Please provide a valid phone number.', 'danger')
+        flash('Please fill in the required fields.', 'danger')
         return redirect(url_for('payments.payment_page'))
+    
+    payment_method = form.payment_method.data
     
     # Get unpaid delegates
     unpaid_delegates = Delegate.query.filter_by(
@@ -66,13 +77,41 @@ def initiate_payment():
         return redirect(url_for('main.dashboard'))
     
     # Calculate total
-    delegate_fee = current_app.config['DELEGATE_FEE']
+    delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     total_amount = len(unpaid_delegates) * delegate_fee
     
+    if payment_method == 'mpesa':
+        # M-Pesa STK Push
+        if not form.phone_number.data:
+            flash('Phone number is required for M-Pesa payment.', 'danger')
+            return redirect(url_for('payments.payment_page'))
+        return initiate_mpesa_payment(form, unpaid_delegates, total_amount, delegate_fee)
+    
+    elif payment_method == 'cash':
+        # Cash payment - only allowed for authorized roles
+        if current_user.role not in PAYMENT_CONFIRMATION_ROLES:
+            flash('Only Finance personnel can confirm cash payments.', 'danger')
+            return redirect(url_for('payments.payment_page'))
+        return record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee)
+    
+    elif payment_method in ['mpesa_paybill', 'bank_transfer']:
+        # Manual verification required
+        if not form.receipt_number.data:
+            flash('Receipt/reference number is required for manual verification.', 'danger')
+            return redirect(url_for('payments.payment_page'))
+        return record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, payment_method)
+    
+    flash('Invalid payment method selected.', 'danger')
+    return redirect(url_for('payments.payment_page'))
+
+
+def initiate_mpesa_payment(form, unpaid_delegates, total_amount, delegate_fee):
+    """Handle M-Pesa STK Push payment"""
     # Create payment record
     payment = Payment(
         user_id=current_user.id,
         amount=total_amount,
+        payment_mode='M-Pesa STK Push',
         phone_number=form.phone_number.data,
         delegates_count=len(unpaid_delegates),
         status='pending'
@@ -107,6 +146,175 @@ def initiate_payment():
     
     flash('Payment request sent! Check your phone to complete the payment.', 'success')
     return redirect(url_for('payments.payment_status', payment_id=payment.id))
+
+
+def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
+    """Handle cash payment confirmation"""
+    try:
+        # Create payment record
+        payment = Payment(
+            user_id=current_user.id,
+            amount=total_amount,
+            payment_mode='Cash',
+            mpesa_receipt_number=form.receipt_number.data or f"CASH-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            delegates_count=len(unpaid_delegates),
+            status='completed',
+            completed_at=datetime.utcnow()
+        )
+        db.session.add(payment)
+        db.session.commit()
+        
+        # Link delegates and mark as paid, assign ticket numbers
+        tickets_issued = 0
+        for delegate in unpaid_delegates:
+            delegate.payment_id = payment.id
+            delegate.is_paid = True
+            delegate.amount_paid = delegate_fee
+            delegate.payment_confirmed_by = current_user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
+            
+            # Generate ticket number if not already assigned
+            if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                tickets_issued += 1
+        
+        db.session.commit()
+        
+        current_app.logger.info(f'Cash payment recorded: {payment.id}, Amount: {total_amount}, Delegates: {len(unpaid_delegates)}')
+        flash(f'Cash payment of KSh {total_amount:,.2f} confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+        return redirect(url_for('payments.payment_status', payment_id=payment.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error recording cash payment: {str(e)}')
+        flash(f'Error recording payment: {str(e)}', 'danger')
+        return redirect(url_for('payments.payment_page'))
+
+
+def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, payment_method):
+    """Handle manual payment verification (paybill/bank transfer)"""
+    try:
+        payment_mode = 'M-Pesa Paybill' if payment_method == 'mpesa_paybill' else 'Bank Transfer'
+        
+        # Create payment record
+        payment = Payment(
+            user_id=current_user.id,
+            amount=total_amount,
+            payment_mode=payment_mode,
+            mpesa_receipt_number=form.receipt_number.data,
+            phone_number=form.phone_number.data,
+            delegates_count=len(unpaid_delegates),
+            status='completed',
+            completed_at=datetime.utcnow()
+        )
+        db.session.add(payment)
+        db.session.commit()
+        
+        # Link delegates and mark as paid, assign ticket numbers
+        tickets_issued = 0
+        for delegate in unpaid_delegates:
+            delegate.payment_id = payment.id
+            delegate.is_paid = True
+            delegate.amount_paid = delegate_fee
+            delegate.payment_confirmed_by = current_user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
+            
+            # Generate ticket number if not already assigned
+            if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                tickets_issued += 1
+        
+        db.session.commit()
+        
+        current_app.logger.info(f'{payment_mode} payment recorded: {payment.id}, Receipt: {form.receipt_number.data}')
+        flash(f'{payment_mode} payment confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+        return redirect(url_for('payments.payment_status', payment_id=payment.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error recording manual payment: {str(e)}')
+        flash(f'Error recording payment: {str(e)}', 'danger')
+        return redirect(url_for('payments.payment_page'))
+
+
+@payments_bp.route('/confirm-cash', methods=['GET', 'POST'])
+@login_required
+def confirm_cash_payment():
+    """Page for finance to confirm cash payments for any delegates"""
+    if current_user.role not in PAYMENT_CONFIRMATION_ROLES:
+        flash('Access denied. Only Finance personnel can confirm cash payments.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    form = CashPaymentForm()
+    delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
+    
+    # Get all unpaid delegates
+    unpaid_delegates = Delegate.query.filter_by(is_paid=False).order_by(
+        Delegate.archdeaconry, Delegate.parish, Delegate.name
+    ).all()
+    
+    if request.method == 'POST' and form.validate_on_submit():
+        try:
+            # Parse delegate IDs
+            delegate_ids = [int(id.strip()) for id in form.delegate_ids.data.split(',') if id.strip()]
+            
+            if not delegate_ids:
+                flash('Please select at least one delegate.', 'danger')
+                return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
+            
+            # Get delegates
+            delegates = Delegate.query.filter(Delegate.id.in_(delegate_ids)).all()
+            
+            if not delegates:
+                flash('No delegates found with the provided IDs.', 'danger')
+                return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
+            
+            # Calculate amount
+            total_amount = len(delegates) * delegate_fee
+            
+            # Create payment record
+            payment = Payment(
+                user_id=current_user.id,
+                amount=total_amount,
+                payment_mode='Cash',
+                mpesa_receipt_number=form.receipt_number.data or f"CASH-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                result_desc=form.notes.data,
+                delegates_count=len(delegates),
+                status='completed',
+                completed_at=datetime.utcnow()
+            )
+            db.session.add(payment)
+            db.session.commit()
+            
+            # Mark delegates as paid and assign tickets
+            tickets_issued = 0
+            for delegate in delegates:
+                delegate.payment_id = payment.id
+                delegate.is_paid = True
+                delegate.amount_paid = delegate_fee
+                delegate.payment_confirmed_by = current_user.id
+                delegate.payment_confirmed_at = datetime.utcnow()
+                
+                # Generate ticket number if not already assigned
+                if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                    event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                    delegate.ticket_number = Delegate.generate_ticket_number(event)
+                    tickets_issued += 1
+            
+            db.session.commit()
+            
+            current_app.logger.info(f'Cash payment confirmed by {current_user.name}: {payment.id}, Delegates: {len(delegates)}')
+            flash(f'Cash payment confirmed for {len(delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+            return redirect(url_for('payments.confirm_cash_payment'))
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'Error confirming cash payment: {str(e)}')
+            flash(f'Error: {str(e)}', 'danger')
+    
+    return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
 
 
 @payments_bp.route('/status/<int:payment_id>')

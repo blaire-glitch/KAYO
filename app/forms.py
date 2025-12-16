@@ -99,11 +99,30 @@ class DelegateForm(FlaskForm):
 
 
 class PaymentForm(FlaskForm):
+    payment_method = SelectField('Payment Method', choices=[
+        ('mpesa', 'M-Pesa STK Push'),
+        ('cash', 'Cash'),
+        ('mpesa_paybill', 'M-Pesa Paybill (Manual)'),
+        ('bank_transfer', 'Bank Transfer')
+    ], default='mpesa')
     phone_number = StringField('M-Pesa Phone Number', validators=[
-        DataRequired(), 
+        Optional(), 
         Length(min=10, max=15)
     ])
-    submit = SubmitField('Pay Now')
+    receipt_number = StringField('Receipt/Reference Number', validators=[
+        Optional(),
+        Length(max=50)
+    ])
+    submit = SubmitField('Process Payment')
+
+
+class CashPaymentForm(FlaskForm):
+    """Form for recording cash payments for delegates"""
+    delegate_ids = StringField('Delegate IDs', validators=[DataRequired()])
+    amount = StringField('Total Amount (KSh)', validators=[DataRequired()])
+    receipt_number = StringField('Receipt Number', validators=[Optional(), Length(max=50)])
+    notes = TextAreaField('Notes', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('Confirm Cash Payment')
 
 
 class AdminUserForm(FlaskForm):
