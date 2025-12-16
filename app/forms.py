@@ -263,6 +263,12 @@ class InstallmentPaymentForm(FlaskForm):
 class FundTransferForm(FlaskForm):
     """Form for initiating fund transfers"""
     amount = StringField('Amount to Transfer (KSh)', validators=[DataRequired()])
+    payment_method = SelectField('Payment Method', choices=[
+        ('cash', 'Cash (Hand over to recipient)'),
+        ('mpesa_paybill', 'M-Pesa Paybill (Direct to Finance)'),
+        ('bank_transfer', 'Bank Transfer')
+    ], validators=[DataRequired()])
+    mpesa_reference = StringField('M-Pesa Transaction Code', validators=[Optional(), Length(max=100)])
     to_user_id = SelectField('Transfer To', coerce=int, validators=[DataRequired()])
     description = TextAreaField('Description/Notes', validators=[Optional()])
     submit = SubmitField('Initiate Transfer')

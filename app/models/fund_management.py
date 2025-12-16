@@ -233,6 +233,10 @@ class FundTransfer(db.Model):
     # Amount being transferred
     amount = db.Column(db.Float, nullable=False)
     
+    # Payment method (how the funds are transferred)
+    payment_method = db.Column(db.String(50), default='cash')  # cash, mpesa_paybill, bank_transfer
+    mpesa_reference = db.Column(db.String(100), nullable=True)  # M-Pesa transaction code if paid via paybill
+    
     # Source (who is sending)
     from_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     from_role = db.Column(db.String(50), nullable=False)  # chair, youth_minister
@@ -243,7 +247,8 @@ class FundTransfer(db.Model):
     
     # Transfer stage/flow
     # chair -> youth_minister -> finance
-    transfer_stage = db.Column(db.String(50), nullable=False)  # chair_to_ym, ym_to_finance
+    # OR chair -> finance (direct paybill)
+    transfer_stage = db.Column(db.String(50), nullable=False)  # chair_to_ym, ym_to_finance, chair_to_finance
     
     # Status
     status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, completed

@@ -537,10 +537,16 @@ def create_transfer():
     
     # Determine recipient options based on role
     if current_user.role == 'chair':
-        # Chairs transfer to youth ministers
-        recipients = User.query.filter_by(role='youth_minister', is_active=True).all()
-        transfer_stage = 'chair_to_ym'
-        to_role = 'youth_minister'
+        # Chairs can transfer to youth ministers (cash) OR directly to finance (paybill)
+        ym_recipients = User.query.filter_by(role='youth_minister', is_active=True).all()
+        finance_recipients = User.query.filter(
+            User.role.in_(['finance', 'admin', 'super_admin']),
+            User.is_active == True
+        ).all()
+        # Combine both for selection
+        recipients = ym_recipients + finance_recipients
+        transfer_stage = 'chair_to_ym'  # Default, may change based on payment method
+        to_role = 'youth_minister'  # Default
     elif current_user.role == 'youth_minister':
         # Youth ministers transfer to finance
         recipients = User.query.filter(
@@ -564,6 +570,32 @@ def create_transfer():
                 if amount <= 0:
                     flash('Amount must be greater than zero.', 'error')
                 else:
+                    # Determine transfer stage and validate payment method
+                    payment_method = form.payment_method.data if hasattr(form, 'payment_method') else 'cash'
+                    mpesa_reference = form.mpesa_reference.data if hasattr(form, 'mpesa_reference') else None
+                    
+                    # Get the recipient to determine the correct transfer stage
+                    recipient = User.query.get(form.to_user_id.data)
+                    if recipient:
+                        if current_user.role == 'chair':
+                            if recipient.role in ['finance', 'admin', 'super_admin']:
+                                # Chair paying directly to finance (via paybill or bank)
+                                transfer_stage = 'chair_to_finance'
+                                to_role = 'finance'
+                            else:
+                                # Chair giving cash to youth minister
+                                transfer_stage = 'chair_to_ym'
+                                to_role = 'youth_minister'
+                        else:
+                            # Youth minister to finance
+                            transfer_stage = 'ym_to_finance'
+                            to_role = 'finance'
+                    
+                    # Validate M-Pesa reference if payment method is paybill
+                    if payment_method == 'mpesa_paybill' and not mpesa_reference:
+                        flash('M-Pesa reference is required for paybill payments.', 'error')
+                        return render_template('fund_management/transfer_form.html', form=form, title='Initiate Fund Transfer')
+                    
                     transfer = FundTransfer(
                         reference_number=FundTransfer.generate_reference(),
                         amount=amount,
@@ -572,6 +604,8 @@ def create_transfer():
                         to_user_id=form.to_user_id.data,
                         to_role=to_role,
                         transfer_stage=transfer_stage,
+                        payment_method=payment_method,
+                        mpesa_reference=mpesa_reference,
                         local_church=current_user.local_church,
                         parish=current_user.parish,
                         archdeaconry=current_user.archdeaconry,
@@ -582,7 +616,7 @@ def create_transfer():
                     db.session.add(transfer)
                     db.session.commit()
                     
-                    current_app.logger.info(f'Transfer created: {transfer.reference_number}, Amount: {transfer.amount}')
+                    current_app.logger.info(f'Transfer created: {transfer.reference_number}, Amount: {transfer.amount}, Method: {payment_method}')
                     flash(f'Fund transfer of KSh {transfer.amount:,.2f} submitted! Reference: {transfer.reference_number}', 'success')
                     return redirect(url_for('fund_management.view_transfer', transfer_id=transfer.id))
             except Exception as e:
@@ -590,7 +624,7 @@ def create_transfer():
                 current_app.logger.error(f'Error creating transfer: {str(e)}')
                 flash(f'Error creating transfer: {str(e)}', 'error')
     
-    return render_template('fund_management/transfer_form.html', form=form, title='Initiate Fund Transfer')
+    return render_template('fund_management/transfer_form.html', form=form, title='Initiate Fund Transfer', is_chair=(current_user.role == 'chair'))
 
 
 @bp.route('/transfers/<int:transfer_id>')

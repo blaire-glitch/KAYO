@@ -13,9 +13,11 @@
                 <div class="card-body">
                     <div class="alert alert-info mb-4">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Transfer Flow:</strong>
-                        {% if current_user.role == 'chair' %}
-                        Chair → Youth Minister → Finance
+                        <strong>Transfer Options:</strong>
+                        {% if is_chair %}
+                        <br><small>• <strong>Cash:</strong> Hand cash to Youth Minister who will forward to Finance</small>
+                        <br><small>• <strong>M-Pesa Paybill:</strong> Pay directly to Finance via paybill</small>
+                        <br><small>• <strong>Bank Transfer:</strong> Transfer directly to Finance account</small>
                         {% else %}
                         Youth Minister → Finance
                         {% endif %}
@@ -36,13 +38,36 @@
                             {% endfor %}
                         </div>
 
+                        {% if is_chair %}
+                        <!-- Payment Method (for chairs) -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">{{ form.payment_method.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.payment_method(class="form-select" + (" is-invalid" if form.payment_method.errors else ""), id="paymentMethod") }}
+                            {% for error in form.payment_method.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="text-muted" id="paymentMethodHelp">Select how you are transferring the funds</small>
+                        </div>
+
+                        <!-- M-Pesa Reference (shown only for paybill) -->
+                        <div class="mb-3" id="mpesaReferenceGroup" style="display: none;">
+                            <label class="form-label fw-semibold">{{ form.mpesa_reference.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.mpesa_reference(class="form-control" + (" is-invalid" if form.mpesa_reference.errors else ""), placeholder="e.g., QJK2ABC345") }}
+                            {% for error in form.mpesa_reference.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="text-muted">Enter the M-Pesa confirmation code from your transaction</small>
+                        </div>
+                        {% endif %}
+
                         <!-- Recipient -->
                         <div class="mb-3">
                             <label class="form-label fw-semibold">{{ form.to_user_id.label.text }} <span class="text-danger">*</span></label>
-                            {{ form.to_user_id(class="form-select" + (" is-invalid" if form.to_user_id.errors else "")) }}
+                            {{ form.to_user_id(class="form-select" + (" is-invalid" if form.to_user_id.errors else ""), id="recipientSelect") }}
                             {% for error in form.to_user_id.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
+                            <small class="text-muted" id="recipientHelp"></small>
                         </div>
 
                         <!-- Description -->
@@ -66,4 +91,34 @@
         </div>
     </div>
 </div>
+
+{% if is_chair %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var paymentMethod = document.getElementById('paymentMethod');
+    var mpesaGroup = document.getElementById('mpesaReferenceGroup');
+    var recipientHelp = document.getElementById('recipientHelp');
+    var paymentHelp = document.getElementById('paymentMethodHelp');
+    
+    function updateUI() {
+        var method = paymentMethod.value;
+        
+        // Show/hide M-Pesa reference field
+        if (method === 'mpesa_paybill') {
+            mpesaGroup.style.display = 'block';
+            recipientHelp.innerHTML = '<i class="fas fa-arrow-right text-success me-1"></i>Select a Finance officer to receive the paybill payment';
+        } else if (method === 'bank_transfer') {
+            mpesaGroup.style.display = 'none';
+            recipientHelp.innerHTML = '<i class="fas fa-arrow-right text-success me-1"></i>Select a Finance officer to receive the bank transfer';
+        } else {
+            mpesaGroup.style.display = 'none';
+            recipientHelp.innerHTML = '<i class="fas fa-arrow-right text-primary me-1"></i>Select the Youth Minister to hand cash to';
+        }
+    }
+    
+    paymentMethod.addEventListener('change', updateUI);
+    updateUI(); // Initial call
+});
+</script>
+{% endif %}
 {% endblock %}
