@@ -21,7 +21,7 @@
                         {% endif %}
                     </div>
 
-                    <form method="POST" class="no-mask" novalidate>
+                    <form method="POST" action="{{ url_for('fund_management.create_transfer') }}" novalidate>
                         {{ form.hidden_tag() }}
                         
                         <!-- Amount -->

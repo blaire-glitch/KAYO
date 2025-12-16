@@ -555,33 +555,39 @@ def create_transfer():
     
     form.to_user_id.choices = [(0, 'Select Recipient')] + [(u.id, f"{u.name} ({u.role})") for u in recipients]
     
-    if form.validate_on_submit():
+    if request.method == 'POST' and form.validate_on_submit():
         if form.to_user_id.data == 0:
             flash('Please select a recipient.', 'error')
         else:
             try:
-                transfer = FundTransfer(
-                    reference_number=FundTransfer.generate_reference(),
-                    amount=float(form.amount.data.replace(',', '')),
-                    from_user_id=current_user.id,
-                    from_role=current_user.role,
-                    to_user_id=form.to_user_id.data,
-                    to_role=to_role,
-                    transfer_stage=transfer_stage,
-                    local_church=current_user.local_church,
-                    parish=current_user.parish,
-                    archdeaconry=current_user.archdeaconry,
-                    event_id=current_user.current_event_id,
-                    description=form.description.data,
-                    submitted_at=datetime.utcnow()
-                )
-                db.session.add(transfer)
-                db.session.commit()
-                
-                flash(f'Fund transfer of KSh {transfer.amount:,.2f} submitted! Reference: {transfer.reference_number}', 'success')
-                return redirect(url_for('fund_management.view_transfer', transfer_id=transfer.id))
+                amount = float(form.amount.data.replace(',', '')) if form.amount.data else 0
+                if amount <= 0:
+                    flash('Amount must be greater than zero.', 'error')
+                else:
+                    transfer = FundTransfer(
+                        reference_number=FundTransfer.generate_reference(),
+                        amount=amount,
+                        from_user_id=current_user.id,
+                        from_role=current_user.role,
+                        to_user_id=form.to_user_id.data,
+                        to_role=to_role,
+                        transfer_stage=transfer_stage,
+                        local_church=current_user.local_church,
+                        parish=current_user.parish,
+                        archdeaconry=current_user.archdeaconry,
+                        event_id=current_user.current_event_id,
+                        description=form.description.data or '',
+                        submitted_at=datetime.utcnow()
+                    )
+                    db.session.add(transfer)
+                    db.session.commit()
+                    
+                    current_app.logger.info(f'Transfer created: {transfer.reference_number}, Amount: {transfer.amount}')
+                    flash(f'Fund transfer of KSh {transfer.amount:,.2f} submitted! Reference: {transfer.reference_number}', 'success')
+                    return redirect(url_for('fund_management.view_transfer', transfer_id=transfer.id))
             except Exception as e:
                 db.session.rollback()
+                current_app.logger.error(f'Error creating transfer: {str(e)}')
                 flash(f'Error creating transfer: {str(e)}', 'error')
     
     return render_template('fund_management/transfer_form.html', form=form, title='Initiate Fund Transfer')
@@ -624,19 +630,38 @@ def approve_transfer(transfer_id):
     
     form = FundTransferApprovalForm()
     
-    if form.validate_on_submit():
+    if request.method == 'POST' and form.validate_on_submit():
         try:
             if form.action.data == 'approve':
-                transfer.approve(current_user, form.notes.data)
+                # Create approval record
+                approval = FundTransferApproval(
+                    transfer_id=transfer.id,
+                    approved_by=current_user.id,
+                    action='approved',
+                    notes=form.notes.data or ''
+                )
+                transfer.status = 'approved'
+                transfer.approved_at = datetime.utcnow()
+                db.session.add(approval)
+                db.session.commit()
                 flash(f'Transfer {transfer.reference_number} approved!', 'success')
             else:
-                transfer.reject(current_user, form.notes.data)
+                # Create rejection record
+                approval = FundTransferApproval(
+                    transfer_id=transfer.id,
+                    approved_by=current_user.id,
+                    action='rejected',
+                    notes=form.notes.data or ''
+                )
+                transfer.status = 'rejected'
+                db.session.add(approval)
+                db.session.commit()
                 flash(f'Transfer {transfer.reference_number} rejected.', 'warning')
             
-            db.session.commit()
             return redirect(url_for('fund_management.view_transfer', transfer_id=transfer_id))
         except Exception as e:
             db.session.rollback()
+            current_app.logger.error(f'Error processing transfer: {str(e)}')
             flash(f'Error processing transfer: {str(e)}', 'error')
     
     return render_template('fund_management/transfer_approve_form.html', form=form, transfer=transfer)
@@ -655,14 +680,25 @@ def complete_transfer(transfer_id):
     
     form = FundTransferCompleteForm()
     
-    if form.validate_on_submit():
+    if request.method == 'POST' and form.validate_on_submit():
         try:
-            transfer.complete(current_user, form.notes.data)
+            # Create completion record
+            approval = FundTransferApproval(
+                transfer_id=transfer.id,
+                approved_by=current_user.id,
+                action='completed',
+                notes=form.notes.data or ''
+            )
+            transfer.status = 'completed'
+            transfer.completed_at = datetime.utcnow()
+            db.session.add(approval)
             db.session.commit()
+            
             flash(f'Transfer {transfer.reference_number} completed! Funds confirmed received.', 'success')
             return redirect(url_for('fund_management.finance_dashboard'))
         except Exception as e:
             db.session.rollback()
+            current_app.logger.error(f'Error completing transfer: {str(e)}')
             flash(f'Error completing transfer: {str(e)}', 'error')
     
     return render_template('fund_management/transfer_complete_form.html', form=form, transfer=transfer)

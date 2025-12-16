@@ -31,7 +31,7 @@
                         By completing this transfer, you confirm that the funds have been received and accounted for.
                     </div>
                     
-                    <form method="POST" class="no-mask" novalidate>
+                    <form method="POST" action="{{ url_for('fund_management.complete_transfer', transfer_id=transfer.id) }}" novalidate>
                         {{ form.hidden_tag() }}
                         
                         <!-- Notes -->

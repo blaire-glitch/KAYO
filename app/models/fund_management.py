@@ -307,6 +307,7 @@ class FundTransfer(db.Model):
         )
         self.status = 'approved'
         self.approved_at = datetime.utcnow()
+        db.session.add(self)
         db.session.add(approval)
         return approval
     
@@ -319,6 +320,7 @@ class FundTransfer(db.Model):
             notes=reason
         )
         self.status = 'rejected'
+        db.session.add(self)
         db.session.add(approval)
         return approval
     
@@ -332,6 +334,7 @@ class FundTransfer(db.Model):
         )
         self.status = 'completed'
         self.completed_at = datetime.utcnow()
+        db.session.add(self)
         db.session.add(approval)
         return approval
 

@@ -36,7 +36,7 @@
                     <h5 class="mb-0"><i class="fas fa-gavel me-2 text-primary"></i>Your Decision</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" class="no-mask" novalidate>
+                    <form method="POST" action="{{ url_for('fund_management.approve_transfer', transfer_id=transfer.id) }}" novalidate>
                         {{ form.hidden_tag() }}
                         
                         <!-- Action -->
