@@ -282,38 +282,56 @@ def record_pledge_payment(pledge_id):
     
     form = PledgePaymentForm()
     
-    if form.validate_on_submit():
-        try:
-            amount = float(form.amount.data.replace(',', ''))
-            
-            # Create the payment record
-            payment = PledgePayment(
-                pledge_id=pledge.id,
-                amount=amount,
-                payment_method=form.payment_method.data,
-                reference=form.reference.data,
-                notes=form.notes.data
-            )
-            db.session.add(payment)
-            
-            # Update the pledge amount_paid directly
-            current_paid = pledge.amount_paid or 0
-            pledge.amount_paid = current_paid + amount
-            
-            # Update status
-            if pledge.amount_paid >= pledge.amount_pledged:
-                pledge.status = 'fulfilled'
-            elif pledge.amount_paid > 0:
-                pledge.status = 'partial'
-            
-            db.session.commit()
-            
-            flash(f'Payment of KSh {amount:,.2f} recorded successfully! Total paid: KSh {pledge.amount_paid:,.2f}', 'success')
-            return redirect(url_for('fund_management.view_pledge', pledge_id=pledge.id))
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f'Error recording payment: {str(e)}')
-            flash(f'Error recording payment: {str(e)}', 'error')
+    if request.method == 'POST':
+        current_app.logger.info(f'POST request received for pledge {pledge_id}')
+        current_app.logger.info(f'Form data: {request.form}')
+        
+        if form.validate_on_submit():
+            try:
+                amount_str = form.amount.data.replace(',', '') if form.amount.data else '0'
+                amount = float(amount_str)
+                
+                if amount <= 0:
+                    flash('Amount must be greater than zero.', 'error')
+                    return render_template('fund_management/pledge_payment_form.html', 
+                                          form=form, pledge=pledge, balance=pledge.get_balance())
+                
+                # Create the payment record
+                payment = PledgePayment(
+                    pledge_id=pledge.id,
+                    amount=amount,
+                    payment_method=form.payment_method.data,
+                    reference=form.reference.data or '',
+                    notes=form.notes.data or ''
+                )
+                db.session.add(payment)
+                
+                # Update the pledge amount_paid directly
+                current_paid = pledge.amount_paid if pledge.amount_paid else 0
+                pledge.amount_paid = current_paid + amount
+                
+                # Update status
+                if pledge.amount_paid >= pledge.amount_pledged:
+                    pledge.status = 'fulfilled'
+                elif pledge.amount_paid > 0:
+                    pledge.status = 'partial'
+                
+                db.session.commit()
+                
+                current_app.logger.info(f'Payment recorded: {amount}, Total: {pledge.amount_paid}')
+                flash(f'Payment of KSh {amount:,.2f} recorded successfully! Total paid: KSh {pledge.amount_paid:,.2f}', 'success')
+                return redirect(url_for('fund_management.view_pledge', pledge_id=pledge.id))
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f'Error recording payment: {str(e)}')
+                flash(f'Error recording payment: {str(e)}', 'error')
+                return render_template('fund_management/pledge_payment_form.html', 
+                                      form=form, pledge=pledge, balance=pledge.get_balance())
+        else:
+            current_app.logger.error(f'Form validation failed: {form.errors}')
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f'{field}: {error}', 'error')
     
     return render_template('fund_management/pledge_payment_form.html', 
                           form=form, 

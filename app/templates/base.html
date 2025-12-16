@@ -803,11 +803,14 @@
             document.addEventListener('submit', function(e) {
                 const form = e.target;
                 
-                // Skip forms that should work normally
+                // Skip forms that should work normally (traditional form submission)
                 if (form.classList.contains('no-mask') || 
+                    form.hasAttribute('data-no-ajax') ||
+                    form.getAttribute('data-turbo') === 'false' ||
                     form.getAttribute('target') === '_blank' ||
                     form.getAttribute('enctype') === 'multipart/form-data') {
-                    return;
+                    console.log('Form submission bypassing AJAX:', form.id || form.action);
+                    return;  // Let form submit normally
                 }
                 
                 e.preventDefault();

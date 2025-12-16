@@ -34,7 +34,7 @@
                     <h5 class="mb-0"><i class="fas fa-money-bill-wave me-2 text-success"></i>Record Payment</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" class="no-mask" novalidate>
+                    <form method="POST" action="{{ url_for('fund_management.record_pledge_payment', pledge_id=pledge.id) }}" class="no-mask" id="pledge-payment-form" data-turbo="false" novalidate>
                         {{ form.hidden_tag() }}
                         
                         <!-- Amount -->
