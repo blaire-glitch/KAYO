@@ -821,7 +821,9 @@
                 
                 const formData = new FormData(form);
                 const method = form.method.toUpperCase() || 'POST';
-                const action = form.action || window.location.href;
+                // Use getAttribute to get the actual action URL, not the form.action property
+                // (form.action can be overridden by an input named "action")
+                const action = form.getAttribute('action') || window.location.href;
                 
                 // Show loading state on submit button
                 const submitBtn = form.querySelector('[type="submit"]');
@@ -987,10 +989,13 @@
                 const sidebar = document.getElementById('sidebar');
                 if (!sidebar) return;
                 
+                // Ensure currentUrl is a string
+                const urlStr = String(currentUrl || '');
+                
                 sidebar.querySelectorAll('.nav-link').forEach(link => {
                     link.classList.remove('active');
                     const href = link.getAttribute('href');
-                    if (href && currentUrl.includes(href)) {
+                    if (href && urlStr.includes(href)) {
                         link.classList.add('active');
                     }
                 });
