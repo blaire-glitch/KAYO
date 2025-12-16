@@ -1812,28 +1812,42 @@ def confirm_payment(user):
         if not delegates:
             return jsonify({'success': False, 'error': 'No delegates found'}), 404
         
-        # Mark delegates as paid and assign ticket numbers
+        current_app.logger.info(f'Mobile API: Confirming payment for delegates: {delegate_ids}')
+        
+        # Mark delegates as paid and assign ticket numbers using direct UPDATE
+        now = datetime.utcnow()
         tickets_issued = []
+        
         for delegate in delegates:
-            # Explicit updates with db.session.add to ensure tracking
-            delegate.is_paid = True
-            delegate.payment_confirmed_by = user.id
-            delegate.payment_confirmed_at = datetime.utcnow()
-            
             # Generate and assign ticket number if not already assigned
+            new_ticket = None
             if not delegate.ticket_number:
                 event = Event.query.get(delegate.event_id) if delegate.event_id else None
-                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                new_ticket = Delegate.generate_ticket_number(event)
                 tickets_issued.append({
                     'delegate_id': delegate.id,
                     'name': delegate.name,
-                    'ticket_number': delegate.ticket_number
+                    'ticket_number': new_ticket
                 })
             
-            # Explicitly add to session to ensure changes are tracked
-            db.session.add(delegate)
+            # Direct UPDATE query to ensure changes are persisted
+            update_data = {
+                'is_paid': True,
+                'payment_confirmed_by': user.id,
+                'payment_confirmed_at': now
+            }
+            if new_ticket:
+                update_data['ticket_number'] = new_ticket
+            
+            db.session.query(Delegate).filter(Delegate.id == delegate.id).update(update_data)
         
         db.session.commit()
+        
+        # Re-fetch delegates to get updated values
+        delegates = Delegate.query.filter(Delegate.id.in_(delegate_ids)).all()
+        
+        # Verify the update worked
+        current_app.logger.info(f'Mobile API: Payment confirmed, verification - delegate {delegates[0].id} is_paid: {delegates[0].is_paid}')
         
         return jsonify({
             'success': True,

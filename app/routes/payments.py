@@ -162,36 +162,51 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
             completed_at=datetime.utcnow()
         )
         db.session.add(payment)
-        db.session.commit()
+        db.session.flush()  # Get the payment.id without committing
         
-        # Link delegates and mark as paid, assign ticket numbers
+        payment_id = payment.id
+        delegate_ids = [d.id for d in unpaid_delegates]
+        now = datetime.utcnow()
+        
+        current_app.logger.info(f'Recording cash payment for delegates: {delegate_ids}')
+        
+        # Use direct UPDATE query to ensure changes are persisted
         tickets_issued = 0
         for delegate in unpaid_delegates:
-            # Explicit updates with db.session.add to ensure tracking
-            delegate.payment_id = payment.id
-            delegate.is_paid = True
-            delegate.amount_paid = delegate_fee
-            delegate.payment_confirmed_by = current_user.id
-            delegate.payment_confirmed_at = datetime.utcnow()
-            
             # Generate ticket number if not already assigned
+            new_ticket = None
             if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
                 event = Event.query.get(delegate.event_id) if delegate.event_id else None
-                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                new_ticket = Delegate.generate_ticket_number(event)
                 tickets_issued += 1
             
-            # Explicitly add to session to ensure changes are tracked
-            db.session.add(delegate)
+            # Direct UPDATE query
+            update_data = {
+                'payment_id': payment_id,
+                'is_paid': True,
+                'amount_paid': delegate_fee,
+                'payment_confirmed_by': current_user.id,
+                'payment_confirmed_at': now
+            }
+            if new_ticket:
+                update_data['ticket_number'] = new_ticket
+            
+            db.session.query(Delegate).filter(Delegate.id == delegate.id).update(update_data)
         
         db.session.commit()
         
-        current_app.logger.info(f'Cash payment recorded: {payment.id}, Amount: {total_amount}, Delegates: {len(unpaid_delegates)}, is_paid updated: True')
+        # Verify the update worked
+        updated_delegate = Delegate.query.get(delegate_ids[0])
+        current_app.logger.info(f'Cash payment recorded: {payment_id}, Verification - delegate {updated_delegate.id} is_paid: {updated_delegate.is_paid}')
+        
         flash(f'Cash payment of KSh {total_amount:,.2f} confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
-        return redirect(url_for('payments.payment_status', payment_id=payment.id))
+        return redirect(url_for('payments.payment_status', payment_id=payment_id))
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'Error recording cash payment: {str(e)}')
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         flash(f'Error recording payment: {str(e)}', 'danger')
         return redirect(url_for('payments.payment_page'))
 
@@ -213,36 +228,51 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
             completed_at=datetime.utcnow()
         )
         db.session.add(payment)
-        db.session.commit()
+        db.session.flush()  # Get the payment.id without committing
         
-        # Link delegates and mark as paid, assign ticket numbers
+        payment_id = payment.id
+        delegate_ids = [d.id for d in unpaid_delegates]
+        now = datetime.utcnow()
+        
+        current_app.logger.info(f'Recording {payment_mode} payment for delegates: {delegate_ids}')
+        
+        # Use direct UPDATE query to ensure changes are persisted
         tickets_issued = 0
         for delegate in unpaid_delegates:
-            # Explicit updates with db.session.add to ensure tracking
-            delegate.payment_id = payment.id
-            delegate.is_paid = True
-            delegate.amount_paid = delegate_fee
-            delegate.payment_confirmed_by = current_user.id
-            delegate.payment_confirmed_at = datetime.utcnow()
-            
             # Generate ticket number if not already assigned
+            new_ticket = None
             if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
                 event = Event.query.get(delegate.event_id) if delegate.event_id else None
-                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                new_ticket = Delegate.generate_ticket_number(event)
                 tickets_issued += 1
             
-            # Explicitly add to session to ensure changes are tracked
-            db.session.add(delegate)
+            # Direct UPDATE query
+            update_data = {
+                'payment_id': payment_id,
+                'is_paid': True,
+                'amount_paid': delegate_fee,
+                'payment_confirmed_by': current_user.id,
+                'payment_confirmed_at': now
+            }
+            if new_ticket:
+                update_data['ticket_number'] = new_ticket
+            
+            db.session.query(Delegate).filter(Delegate.id == delegate.id).update(update_data)
         
         db.session.commit()
         
-        current_app.logger.info(f'{payment_mode} payment recorded: {payment.id}, Receipt: {form.receipt_number.data}, is_paid updated: True')
+        # Verify the update worked
+        updated_delegate = Delegate.query.get(delegate_ids[0])
+        current_app.logger.info(f'{payment_mode} payment recorded: {payment_id}, Verification - delegate {updated_delegate.id} is_paid: {updated_delegate.is_paid}')
+        
         flash(f'{payment_mode} payment confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
-        return redirect(url_for('payments.payment_status', payment_id=payment.id))
+        return redirect(url_for('payments.payment_status', payment_id=payment_id))
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'Error recording manual payment: {str(e)}')
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         flash(f'Error recording payment: {str(e)}', 'danger')
         return redirect(url_for('payments.payment_page'))
 
@@ -267,6 +297,8 @@ def confirm_cash_payment():
         try:
             # Parse delegate IDs
             delegate_ids = [int(id.strip()) for id in form.delegate_ids.data.split(',') if id.strip()]
+            
+            current_app.logger.info(f'Confirm cash payment request for delegate IDs: {delegate_ids}')
             
             if not delegate_ids:
                 flash('Please select at least one delegate.', 'danger')
@@ -294,36 +326,48 @@ def confirm_cash_payment():
                 completed_at=datetime.utcnow()
             )
             db.session.add(payment)
-            db.session.commit()
+            db.session.flush()  # Get the payment.id without committing
             
-            # Mark delegates as paid and assign tickets
+            payment_id = payment.id
+            now = datetime.utcnow()
+            
+            # Use direct UPDATE query to ensure changes are persisted
             tickets_issued = 0
             for delegate in delegates:
-                # Explicit updates with db.session.add to ensure tracking
-                delegate.payment_id = payment.id
-                delegate.is_paid = True
-                delegate.amount_paid = delegate_fee
-                delegate.payment_confirmed_by = current_user.id
-                delegate.payment_confirmed_at = datetime.utcnow()
-                
                 # Generate ticket number if not already assigned
+                new_ticket = None
                 if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
                     event = Event.query.get(delegate.event_id) if delegate.event_id else None
-                    delegate.ticket_number = Delegate.generate_ticket_number(event)
+                    new_ticket = Delegate.generate_ticket_number(event)
                     tickets_issued += 1
                 
-                # Explicitly add to session to ensure changes are tracked
-                db.session.add(delegate)
+                # Direct UPDATE query
+                update_data = {
+                    'payment_id': payment_id,
+                    'is_paid': True,
+                    'amount_paid': delegate_fee,
+                    'payment_confirmed_by': current_user.id,
+                    'payment_confirmed_at': now
+                }
+                if new_ticket:
+                    update_data['ticket_number'] = new_ticket
+                
+                db.session.query(Delegate).filter(Delegate.id == delegate.id).update(update_data)
             
             db.session.commit()
             
-            current_app.logger.info(f'Cash payment confirmed by {current_user.name}: {payment.id}, Delegates: {len(delegates)}, is_paid updated: True')
+            # Verify the update worked
+            updated_delegate = Delegate.query.get(delegate_ids[0])
+            current_app.logger.info(f'Cash payment confirmed by {current_user.name}: {payment_id}, Verification - delegate {updated_delegate.id} is_paid: {updated_delegate.is_paid}')
+            
             flash(f'Cash payment confirmed for {len(delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
             return redirect(url_for('payments.confirm_cash_payment'))
             
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f'Error confirming cash payment: {str(e)}')
+            import traceback
+            current_app.logger.error(traceback.format_exc())
             flash(f'Error: {str(e)}', 'danger')
     
     return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
