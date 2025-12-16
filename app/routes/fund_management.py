@@ -252,8 +252,9 @@ def view_pledge(pledge_id):
     """View pledge details"""
     pledge = Pledge.query.get_or_404(pledge_id)
     
-    # Check access
-    if current_user.role not in ['admin', 'super_admin', 'finance'] and pledge.recorded_by != current_user.id:
+    # Check access - chairs and youth ministers can view their own pledges
+    allowed_roles = ['admin', 'super_admin', 'finance', 'chair', 'youth_minister']
+    if current_user.role not in allowed_roles and pledge.recorded_by != current_user.id:
         flash('You do not have permission to view this pledge.', 'error')
         return redirect(url_for('fund_management.list_pledges'))
     
@@ -269,8 +270,9 @@ def record_pledge_payment(pledge_id):
     """Record a payment against a pledge"""
     pledge = Pledge.query.get_or_404(pledge_id)
     
-    # Check access
-    if current_user.role not in ['admin', 'super_admin', 'finance'] and pledge.recorded_by != current_user.id:
+    # Check access - chairs can record payments for their own pledges
+    allowed_roles = ['admin', 'super_admin', 'finance', 'chair', 'youth_minister']
+    if current_user.role not in allowed_roles and pledge.recorded_by != current_user.id:
         flash('You do not have permission to record payments for this pledge.', 'error')
         return redirect(url_for('fund_management.list_pledges'))
     
@@ -305,7 +307,9 @@ def cancel_pledge(pledge_id):
     """Cancel a pledge"""
     pledge = Pledge.query.get_or_404(pledge_id)
     
-    if current_user.role not in ['admin', 'super_admin'] and pledge.recorded_by != current_user.id:
+    # Chairs can cancel their own pledges that have no payments
+    allowed_roles = ['admin', 'super_admin', 'chair']
+    if current_user.role not in allowed_roles and pledge.recorded_by != current_user.id:
         flash('You do not have permission to cancel this pledge.', 'error')
         return redirect(url_for('fund_management.list_pledges'))
     
