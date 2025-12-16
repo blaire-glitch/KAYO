@@ -250,7 +250,11 @@ def create_pledge():
 @login_required
 def view_pledge(pledge_id):
     """View pledge details"""
-    pledge = Pledge.query.get_or_404(pledge_id)
+    # Refresh from database to get latest data
+    pledge = db.session.get(Pledge, pledge_id)
+    if not pledge:
+        from flask import abort
+        abort(404)
     
     # Check access - chairs and youth ministers can view their own pledges
     allowed_roles = ['admin', 'super_admin', 'finance', 'chair', 'youth_minister']
@@ -258,7 +262,7 @@ def view_pledge(pledge_id):
         flash('You do not have permission to view this pledge.', 'error')
         return redirect(url_for('fund_management.list_pledges'))
     
-    payments = pledge.payments.order_by(PledgePayment.created_at.desc()).all()
+    payments = PledgePayment.query.filter_by(pledge_id=pledge_id).order_by(PledgePayment.created_at.desc()).all()
     today = date.today()
     form = EmptyForm()  # For CSRF token in cancel form
     return render_template('fund_management/pledge_view.html', pledge=pledge, payments=payments, today=today, form=form)
@@ -281,18 +285,34 @@ def record_pledge_payment(pledge_id):
     if form.validate_on_submit():
         try:
             amount = float(form.amount.data.replace(',', ''))
-            payment = pledge.add_payment(
+            
+            # Create the payment record
+            payment = PledgePayment(
+                pledge_id=pledge.id,
                 amount=amount,
                 payment_method=form.payment_method.data,
                 reference=form.reference.data,
                 notes=form.notes.data
             )
+            db.session.add(payment)
+            
+            # Update the pledge amount_paid directly
+            current_paid = pledge.amount_paid or 0
+            pledge.amount_paid = current_paid + amount
+            
+            # Update status
+            if pledge.amount_paid >= pledge.amount_pledged:
+                pledge.status = 'fulfilled'
+            elif pledge.amount_paid > 0:
+                pledge.status = 'partial'
+            
             db.session.commit()
             
-            flash(f'Payment of KSh {amount:,.2f} recorded successfully!', 'success')
+            flash(f'Payment of KSh {amount:,.2f} recorded successfully! Total paid: KSh {pledge.amount_paid:,.2f}', 'success')
             return redirect(url_for('fund_management.view_pledge', pledge_id=pledge.id))
         except Exception as e:
             db.session.rollback()
+            current_app.logger.error(f'Error recording payment: {str(e)}')
             flash(f'Error recording payment: {str(e)}', 'error')
     
     return render_template('fund_management/pledge_payment_form.html', 

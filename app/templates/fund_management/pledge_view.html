@@ -45,7 +45,7 @@
                             <p class="h4 text-primary mb-3">KSh {{ "{:,.2f}".format(pledge.amount_pledged) }}</p>
                             
                             <h6 class="text-muted mb-1">Amount Paid</h6>
-                            <p class="h4 text-success mb-3">KSh {{ "{:,.2f}".format(pledge.amount_paid) }}</p>
+                            <p class="h4 text-success mb-3">KSh {{ "{:,.2f}".format(pledge.amount_paid or 0) }}</p>
                             
                             <h6 class="text-muted mb-1">Balance</h6>
                             <p class="h4 text-{{ 'danger' if pledge.get_balance() > 0 else 'success' }} mb-3">KSh {{ "{:,.2f}".format(pledge.get_balance()) }}</p>
@@ -56,10 +56,10 @@
                     <div class="mb-4">
                         <div class="d-flex justify-content-between mb-1">
                             <small class="text-muted">Payment Progress</small>
-                            <small class="text-muted">{{ "{:.1f}".format((pledge.amount_paid / pledge.amount_pledged * 100) if pledge.amount_pledged > 0 else 0) }}%</small>
+                            <small class="text-muted">{{ "{:.1f}".format(((pledge.amount_paid or 0) / pledge.amount_pledged * 100) if pledge.amount_pledged > 0 else 0) }}%</small>
                         </div>
                         <div class="progress" style="height: 12px;">
-                            <div class="progress-bar bg-success" style="width: {{ (pledge.amount_paid / pledge.amount_pledged * 100) if pledge.amount_pledged > 0 else 0 }}%"></div>
+                            <div class="progress-bar bg-success" style="width: {{ ((pledge.amount_paid or 0) / pledge.amount_pledged * 100) if pledge.amount_pledged > 0 else 0 }}%"></div>
                         </div>
                     </div>
                     
