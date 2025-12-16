@@ -167,6 +167,7 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
         # Link delegates and mark as paid, assign ticket numbers
         tickets_issued = 0
         for delegate in unpaid_delegates:
+            # Explicit updates with db.session.add to ensure tracking
             delegate.payment_id = payment.id
             delegate.is_paid = True
             delegate.amount_paid = delegate_fee
@@ -178,10 +179,13 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
                 event = Event.query.get(delegate.event_id) if delegate.event_id else None
                 delegate.ticket_number = Delegate.generate_ticket_number(event)
                 tickets_issued += 1
+            
+            # Explicitly add to session to ensure changes are tracked
+            db.session.add(delegate)
         
         db.session.commit()
         
-        current_app.logger.info(f'Cash payment recorded: {payment.id}, Amount: {total_amount}, Delegates: {len(unpaid_delegates)}')
+        current_app.logger.info(f'Cash payment recorded: {payment.id}, Amount: {total_amount}, Delegates: {len(unpaid_delegates)}, is_paid updated: True')
         flash(f'Cash payment of KSh {total_amount:,.2f} confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
         return redirect(url_for('payments.payment_status', payment_id=payment.id))
         
@@ -214,6 +218,7 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
         # Link delegates and mark as paid, assign ticket numbers
         tickets_issued = 0
         for delegate in unpaid_delegates:
+            # Explicit updates with db.session.add to ensure tracking
             delegate.payment_id = payment.id
             delegate.is_paid = True
             delegate.amount_paid = delegate_fee
@@ -225,10 +230,13 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
                 event = Event.query.get(delegate.event_id) if delegate.event_id else None
                 delegate.ticket_number = Delegate.generate_ticket_number(event)
                 tickets_issued += 1
+            
+            # Explicitly add to session to ensure changes are tracked
+            db.session.add(delegate)
         
         db.session.commit()
         
-        current_app.logger.info(f'{payment_mode} payment recorded: {payment.id}, Receipt: {form.receipt_number.data}')
+        current_app.logger.info(f'{payment_mode} payment recorded: {payment.id}, Receipt: {form.receipt_number.data}, is_paid updated: True')
         flash(f'{payment_mode} payment confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
         return redirect(url_for('payments.payment_status', payment_id=payment.id))
         
@@ -291,6 +299,7 @@ def confirm_cash_payment():
             # Mark delegates as paid and assign tickets
             tickets_issued = 0
             for delegate in delegates:
+                # Explicit updates with db.session.add to ensure tracking
                 delegate.payment_id = payment.id
                 delegate.is_paid = True
                 delegate.amount_paid = delegate_fee
@@ -302,10 +311,13 @@ def confirm_cash_payment():
                     event = Event.query.get(delegate.event_id) if delegate.event_id else None
                     delegate.ticket_number = Delegate.generate_ticket_number(event)
                     tickets_issued += 1
+                
+                # Explicitly add to session to ensure changes are tracked
+                db.session.add(delegate)
             
             db.session.commit()
             
-            current_app.logger.info(f'Cash payment confirmed by {current_user.name}: {payment.id}, Delegates: {len(delegates)}')
+            current_app.logger.info(f'Cash payment confirmed by {current_user.name}: {payment.id}, Delegates: {len(delegates)}, is_paid updated: True')
             flash(f'Cash payment confirmed for {len(delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
             return redirect(url_for('payments.confirm_cash_payment'))
             

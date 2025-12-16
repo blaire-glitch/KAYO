@@ -1815,6 +1815,7 @@ def confirm_payment(user):
         # Mark delegates as paid and assign ticket numbers
         tickets_issued = []
         for delegate in delegates:
+            # Explicit updates with db.session.add to ensure tracking
             delegate.is_paid = True
             delegate.payment_confirmed_by = user.id
             delegate.payment_confirmed_at = datetime.utcnow()
@@ -1828,6 +1829,9 @@ def confirm_payment(user):
                     'name': delegate.name,
                     'ticket_number': delegate.ticket_number
                 })
+            
+            # Explicitly add to session to ensure changes are tracked
+            db.session.add(delegate)
         
         db.session.commit()
         
