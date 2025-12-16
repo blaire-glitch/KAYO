@@ -60,11 +60,15 @@ def initiate_payment():
     """Initiate payment based on selected method"""
     form = PaymentForm()
     
+    current_app.logger.info(f'Payment initiate request - Form data: {request.form}')
+    
     if not form.validate_on_submit():
+        current_app.logger.error(f'Form validation failed: {form.errors}')
         flash('Please fill in the required fields.', 'danger')
         return redirect(url_for('payments.payment_page'))
     
     payment_method = form.payment_method.data
+    current_app.logger.info(f'Payment method selected: {payment_method}')
     
     # Get unpaid delegates
     unpaid_delegates = Delegate.query.filter_by(
