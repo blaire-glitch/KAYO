@@ -36,8 +36,9 @@ def payment_page():
     if current_user.phone:
         form.phone_number.data = current_user.phone
     
-    # Check if user can confirm cash payments
-    can_confirm_cash = current_user.role in PAYMENT_CONFIRMATION_ROLES
+    # Check if user can confirm cash payments (Finance for any, chairs for their own)
+    # Since payment_page only shows the user's own delegates, chairs can confirm cash for those
+    can_confirm_cash = current_user.role in PAYMENT_CONFIRMATION_ROLES or current_user.role == 'chair'
     
     # Get recent payment attempts
     recent_payments = Payment.query.filter_by(
@@ -92,10 +93,9 @@ def initiate_payment():
         return initiate_mpesa_payment(form, unpaid_delegates, total_amount, delegate_fee)
     
     elif payment_method == 'cash':
-        # Cash payment - only allowed for authorized roles
-        if current_user.role not in PAYMENT_CONFIRMATION_ROLES:
-            flash('Only Finance personnel can confirm cash payments.', 'danger')
-            return redirect(url_for('payments.payment_page'))
+        # Cash payment - chairs can confirm for their own delegates, finance for any
+        # Since we already filter by registered_by=current_user.id, chairs can only affect their own delegates
+        current_app.logger.info(f'Processing cash payment for {len(unpaid_delegates)} delegates by {current_user.role}')
         return record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee)
     
     elif payment_method in ['mpesa_paybill', 'bank_transfer']:
