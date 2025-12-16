@@ -62,19 +62,22 @@ class Pledge(db.Model):
     
     def get_balance(self):
         """Get remaining balance"""
-        return self.amount_pledged - self.amount_paid
+        return self.amount_pledged - (self.amount_paid or 0)
     
     def update_status(self):
         """Update status based on payments"""
-        if self.amount_paid >= self.amount_pledged:
+        amount_paid = self.amount_paid or 0
+        if amount_paid >= self.amount_pledged:
             self.status = 'fulfilled'
-        elif self.amount_paid > 0:
+        elif amount_paid > 0:
             self.status = 'partial'
         else:
             self.status = 'pending'
     
     def add_payment(self, amount, payment_method, reference=None, notes=None):
         """Record a payment against this pledge"""
+        from sqlalchemy.orm.attributes import flag_modified
+        
         payment = PledgePayment(
             pledge_id=self.id,
             amount=amount,
@@ -82,8 +85,11 @@ class Pledge(db.Model):
             reference=reference,
             notes=notes
         )
-        self.amount_paid += amount
+        self.amount_paid = (self.amount_paid or 0) + amount
         self.update_status()
+        
+        # Ensure SQLAlchemy tracks the changes to this pledge
+        db.session.add(self)
         db.session.add(payment)
         return payment
 
