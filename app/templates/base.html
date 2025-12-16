@@ -760,15 +760,18 @@
             });
         }
         
-        // URL Masking - Single Page Navigation
+        // URL Masking - Single Page Navigation (Full Masking)
         (function() {
             const APP_BASE = '/app';
+            const PUBLIC_ROUTES = ['/', '/login', '/register', '/auth/login', '/auth/register'];
             
-            // Replace browser URL without reloading
-            if (window.location.pathname !== '/' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-                // Replace current URL with masked URL (keep same page loaded)
-                window.history.replaceState({}, document.title, APP_BASE);
+            // Mask URL on page load (except public routes)
+            function maskUrl() {
+                if (!PUBLIC_ROUTES.some(route => window.location.pathname === route || window.location.pathname.startsWith(route + '?'))) {
+                    window.history.replaceState({ masked: true }, document.title, APP_BASE);
+                }
             }
+            maskUrl();
             
             // Intercept all internal link clicks
             document.addEventListener('click', function(e) {
@@ -803,15 +806,16 @@
             document.addEventListener('submit', function(e) {
                 const form = e.target;
                 
-                // Skip forms that should work normally (traditional form submission)
-                if (form.classList.contains('no-mask') || 
-                    form.hasAttribute('data-no-ajax') ||
-                    form.getAttribute('data-turbo') === 'false' ||
-                    form.getAttribute('target') === '_blank' ||
-                    form.getAttribute('enctype') === 'multipart/form-data') {
-                    console.log('Form submission bypassing AJAX:', form.id || form.action);
+                // Forms that should submit traditionally (file uploads, special cases)
+                if (form.getAttribute('enctype') === 'multipart/form-data' ||
+                    form.getAttribute('target') === '_blank') {
                     return;  // Let form submit normally
                 }
+                
+                // Forms marked with no-mask will submit via AJAX but stay on current view
+                const isNoMask = form.classList.contains('no-mask') || 
+                                 form.hasAttribute('data-no-ajax') ||
+                                 form.getAttribute('data-turbo') === 'false';
                 
                 e.preventDefault();
                 
@@ -819,9 +823,81 @@
                 const method = form.method.toUpperCase() || 'POST';
                 const action = form.action || window.location.href;
                 
-                loadPage(action, {
+                // Show loading state on submit button
+                const submitBtn = form.querySelector('[type="submit"]');
+                const originalText = submitBtn ? submitBtn.innerHTML : '';
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                }
+                
+                fetch(action, {
                     method: method,
-                    body: method === 'GET' ? null : formData
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    // Handle redirects
+                    if (response.redirected) {
+                        return fetch(response.url, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin'
+                        }).then(r => ({ html: r.text(), url: response.url }));
+                    }
+                    return response.text().then(html => ({ html: Promise.resolve(html), url: action }));
+                })
+                .then(result => result.html.then(html => ({ html, url: result.url })))
+                .then(({ html, url }) => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Update main content
+                    const newMain = doc.querySelector('main.main-content');
+                    const currentMain = document.querySelector('main.main-content');
+                    
+                    if (newMain && currentMain) {
+                        currentMain.innerHTML = newMain.innerHTML;
+                    }
+                    
+                    // Update page title
+                    const newTitle = doc.querySelector('title');
+                    if (newTitle) {
+                        document.title = newTitle.textContent;
+                    }
+                    
+                    // Update active sidebar links
+                    updateActiveSidebarLinks(url);
+                    
+                    // Execute inline scripts
+                    if (currentMain) {
+                        currentMain.querySelectorAll('script').forEach(script => {
+                            const newScript = document.createElement('script');
+                            if (script.src) {
+                                newScript.src = script.src;
+                            } else {
+                                newScript.textContent = script.textContent;
+                            }
+                            script.parentNode.replaceChild(newScript, script);
+                        });
+                    }
+                    
+                    // Scroll to top
+                    window.scrollTo(0, 0);
+                    
+                    // Keep URL masked
+                    maskUrl();
+                })
+                .catch(error => {
+                    console.error('Form submission error:', error);
+                    // Restore button and show error
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                    }
+                    alert('An error occurred. Please try again.');
                 });
             });
             
@@ -897,7 +973,7 @@
                         window.scrollTo(0, 0);
                         
                         // Keep URL masked
-                        window.history.replaceState({}, document.title, APP_BASE);
+                        maskUrl();
                     })
                     .catch(error => {
                         console.error('Navigation error:', error);
