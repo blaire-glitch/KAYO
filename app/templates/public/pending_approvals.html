@@ -207,40 +207,35 @@
 
 {% block extra_js %}
 <script>
-// Wait for DOM to be ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Copy link function
-    window.copyLink = function() {
-        const input = document.getElementById('publicLink');
-        if (input) {
-            input.select();
-            navigator.clipboard.writeText(input.value).then(function() {
-                const btn = input.nextElementSibling;
-                btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
-                btn.classList.remove('btn-outline-primary');
-                btn.classList.add('btn-success');
-                setTimeout(function() {
-                    btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-primary');
-                }, 2000);
-            });
-        }
-    };
+// Define functions immediately (not in DOMContentLoaded) so onclick handlers work
+function copyLink() {
+    const input = document.getElementById('publicLink');
+    if (input) {
+        input.select();
+        navigator.clipboard.writeText(input.value).then(function() {
+            const btn = input.nextElementSibling;
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-success');
+            setTimeout(function() {
+                btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+            }, 2000);
+        });
+    }
+}
 
-    // Approve registration function
-    window.approveRegistration = function(id, name) {
-        document.getElementById('approveName').textContent = name;
-        document.getElementById('approveForm').action = '/register/approvals/' + id + '/approve';
-        new bootstrap.Modal(document.getElementById('approveModal')).show();
-    };
+function approveRegistration(id, name) {
+    document.getElementById('approveName').textContent = name;
+    document.getElementById('approveForm').action = '/register/approvals/' + id + '/approve';
+    new bootstrap.Modal(document.getElementById('approveModal')).show();
+}
 
-    // Reject registration function
-    window.rejectRegistration = function(id, name) {
-        document.getElementById('rejectName').textContent = name;
-        document.getElementById('rejectForm').action = '/register/approvals/' + id + '/reject';
-        new bootstrap.Modal(document.getElementById('rejectModal')).show();
-    };
-});
+function rejectRegistration(id, name) {
+    document.getElementById('rejectName').textContent = name;
+    document.getElementById('rejectForm').action = '/register/approvals/' + id + '/reject';
+    new bootstrap.Modal(document.getElementById('rejectModal')).show();
+}
 </script>
 {% endblock %}
