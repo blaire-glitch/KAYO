@@ -203,17 +203,15 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- Inline script to ensure functions are available -->
 <script>
-// Define functions immediately (not in DOMContentLoaded) so onclick handlers work
 function copyLink() {
-    const input = document.getElementById('publicLink');
+    var input = document.getElementById('publicLink');
     if (input) {
         input.select();
         navigator.clipboard.writeText(input.value).then(function() {
-            const btn = input.nextElementSibling;
+            var btn = input.nextElementSibling;
             btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
             btn.classList.remove('btn-outline-primary');
             btn.classList.add('btn-success');
