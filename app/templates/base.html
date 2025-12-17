@@ -648,21 +648,32 @@
                                 <i class="bi bi-speedometer2"></i>Dashboard
                             </a>
                         </li>
+                        {% if current_user.role != 'youth_minister' %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'delegates.register_delegate' %}active{% endif %}" href="{{ url_for('delegates.register_delegate') }}">
                                 <i class="bi bi-person-plus"></i>Register
                             </a>
                         </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'delegates.list_delegates' %}active{% endif %}" href="{{ url_for('delegates.list_delegates') }}">
-                                <i class="bi bi-list-ul"></i>My Delegates
+                                <i class="bi bi-list-ul"></i>{% if current_user.role == 'youth_minister' %}View{% else %}My{% endif %} Delegates
                             </a>
                         </li>
+                        {% if current_user.role in ['chair', 'admin', 'super_admin', 'youth_minister'] %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'public.pending_approvals' in request.endpoint %}active{% endif %}" href="{{ url_for('public.pending_approvals') }}">
+                                <i class="bi bi-person-check"></i>Approvals
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if current_user.role != 'youth_minister' %}
                         <li class="nav-item">
                             <a class="nav-link {% if 'payments' in request.endpoint %}active{% endif %}" href="{{ url_for('payments.payment_page') }}">
                                 <i class="bi bi-wallet2"></i>Pay
                             </a>
                         </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'payments.payment_history' %}active{% endif %}" href="{{ url_for('payments.payment_history') }}">
                                 <i class="bi bi-clock-history"></i>History

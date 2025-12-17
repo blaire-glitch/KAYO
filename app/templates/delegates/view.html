@@ -110,6 +110,7 @@
                             <i class="bi bi-person-badge me-1"></i>Badge
                         </a>
                     </div>
+                    {% if can_edit is not defined or can_edit %}
                     <div>
                         {% if not delegate.is_paid %}
                         <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-primary">
@@ -122,6 +123,7 @@
                         </form>
                         {% endif %}
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -18,6 +18,11 @@ PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin', 'r
 @login_required
 def payment_page():
     """Show payment page with unpaid delegates"""
+    # Youth ministers have view-only access
+    if current_user.role == 'youth_minister':
+        flash('Youth ministers have view-only access and cannot process payments.', 'warning')
+        return redirect(url_for('main.dashboard'))
+    
     # Get unpaid delegates
     unpaid_delegates = Delegate.query.filter_by(
         registered_by=current_user.id,
@@ -59,6 +64,11 @@ def payment_page():
 @login_required
 def initiate_payment():
     """Initiate payment based on selected method"""
+    # Youth ministers have view-only access
+    if current_user.role == 'youth_minister':
+        flash('Youth ministers have view-only access and cannot process payments.', 'warning')
+        return redirect(url_for('main.dashboard'))
+    
     form = PaymentForm()
     
     current_app.logger.info(f'Payment initiate request - Form data: {request.form}')

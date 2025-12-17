@@ -11,6 +11,7 @@ from app.models.fund_management import (
     Pledge, PledgePayment, ScheduledPayment, ScheduledPaymentInstallment,
     FundTransfer, FundTransferApproval, PaymentSummary
 )
+from app.models.pending_delegate import PendingDelegate
 
 __all__ = [
     'User', 'Delegate', 'Payment',
@@ -19,5 +20,6 @@ __all__ = [
     'CheckInRecord', 'Announcement', 'PaymentReminder', 'PaymentDiscrepancy',
     'PermissionRequest',
     'Pledge', 'PledgePayment', 'ScheduledPayment', 'ScheduledPaymentInstallment',
-    'FundTransfer', 'FundTransferApproval', 'PaymentSummary'
+    'FundTransfer', 'FundTransferApproval', 'PaymentSummary',
+    'PendingDelegate'
 ]

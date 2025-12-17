@@ -205,10 +205,10 @@ class Role(db.Model):
             },
             {
                 'name': 'youth_minister',
-                'description': 'Youth Minister - can register and manage delegates',
+                'description': 'Youth Minister - view-only access to delegates and reports',
                 'permissions': [
-                    'delegates.view', 'delegates.create', 'delegates.edit',
-                    'payments.view', 'payments.process',
+                    'delegates.view',
+                    'payments.view',
                     'check_in.view',
                     'reports.view'
                 ],
