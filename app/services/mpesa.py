@@ -22,6 +22,11 @@ class MpesaAPI:
     
     def get_access_token(self):
         """Get OAuth access token from M-Pesa API"""
+        # Check if credentials are configured
+        if not self.consumer_key or not self.consumer_secret:
+            current_app.logger.error("M-Pesa credentials not configured! Set MPESA_CONSUMER_KEY and MPESA_CONSUMER_SECRET")
+            return None
+        
         url = f"{self.base_url}/oauth/v1/generate?grant_type=client_credentials"
         
         # Create basic auth header
@@ -33,7 +38,16 @@ class MpesaAPI:
         }
         
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
+            
+            if response.status_code == 400:
+                current_app.logger.error(f"M-Pesa auth failed: Invalid Consumer Key or Secret. Status: {response.status_code}")
+                current_app.logger.error(f"Consumer Key starts with: {self.consumer_key[:8] if self.consumer_key else 'NOT SET'}...")
+                return None
+            elif response.status_code == 401:
+                current_app.logger.error("M-Pesa auth failed: Unauthorized - credentials may be expired or revoked")
+                return None
+            
             response.raise_for_status()
             return response.json().get('access_token')
         except requests.exceptions.RequestException as e:
