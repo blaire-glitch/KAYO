@@ -55,30 +55,46 @@ def process_scan():
     if not qr_data:
         return jsonify({'success': False, 'error': 'No QR data provided'})
     
-    # Parse QR data - could be ticket number, delegate number, or full URL
+    # Parse QR data - could be ticket number, delegate number, pipe-separated format, or full URL
     delegate = None
+    search_value = qr_data
     
-    # Try different formats
-    if qr_data.startswith('KAYO-'):
-        # Ticket number format
-        delegate = Delegate.query.filter_by(ticket_number=qr_data).first()
-    elif qr_data.isdigit():
-        # Delegate ID or number
-        delegate = Delegate.query.filter_by(id=int(qr_data)).first()
-        if not delegate:
-            delegate = Delegate.query.filter_by(delegate_number=qr_data).first()
-    elif '/delegates/' in qr_data:
-        # URL format - extract ID
+    # Handle pipe-separated format: KAYO|ticket_number|name|phone
+    if '|' in qr_data:
+        parts = qr_data.split('|')
+        if len(parts) >= 2:
+            search_value = parts[1]  # ticket_number is second part
+    
+    # Handle DELEGATE-ID format (fallback from badges when no ticket number)
+    if search_value.startswith('DELEGATE-'):
         try:
-            delegate_id = int(qr_data.split('/delegates/')[-1].split('/')[0])
+            delegate_id = int(search_value.replace('DELEGATE-', ''))
             delegate = Delegate.query.get(delegate_id)
-        except:
+        except ValueError:
             pass
-    else:
-        # Try as ticket number without prefix
-        delegate = Delegate.query.filter_by(ticket_number=qr_data).first()
-        if not delegate:
-            delegate = Delegate.query.filter_by(delegate_number=qr_data).first()
+    
+    # Try different formats if not found yet
+    if not delegate:
+        if search_value.startswith('KAYO-') or '-' in search_value:
+            # Ticket number format (e.g., KAYO-2025-0001 or EVENT-2025-0001)
+            delegate = Delegate.query.filter_by(ticket_number=search_value).first()
+        elif search_value.isdigit():
+            # Delegate ID or delegate number
+            delegate = Delegate.query.filter_by(id=int(search_value)).first()
+            if not delegate:
+                delegate = Delegate.query.filter_by(delegate_number=search_value).first()
+        elif '/delegates/' in search_value:
+            # URL format - extract ID
+            try:
+                delegate_id = int(search_value.split('/delegates/')[-1].split('/')[0])
+                delegate = Delegate.query.get(delegate_id)
+            except:
+                pass
+        else:
+            # Try as ticket number or delegate number
+            delegate = Delegate.query.filter_by(ticket_number=search_value).first()
+            if not delegate:
+                delegate = Delegate.query.filter_by(delegate_number=search_value).first()
     
     if not delegate:
         return jsonify({

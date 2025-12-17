@@ -258,7 +258,9 @@ class BadgeDesigner:
                 return placeholder
             return None
         
-        qr_data = f"KAYO-{delegate.ticket_number or delegate.id}"
+        # Use ticket_number directly (it already has the format KAYO-2025-XXXX)
+        # Or fall back to delegate ID if no ticket number
+        qr_data = delegate.ticket_number or f"DELEGATE-{delegate.id}"
         
         qr = qrcode.QRCode(
             version=1,

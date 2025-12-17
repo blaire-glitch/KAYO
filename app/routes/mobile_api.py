@@ -1420,22 +1420,39 @@ def scan_checkin(user):
     if not qr_data:
         return jsonify({'error': 'QR data required'}), 400
     
-    # Parse QR code - format: KAYO|TICKET_NUMBER|NAME|PHONE
-    try:
-        parts = qr_data.split('|')
-        ticket_number = parts[1] if len(parts) > 1 else qr_data
-    except:
-        ticket_number = qr_data
+    # Parse QR code - supports multiple formats:
+    # 1. Pipe format: KAYO|TICKET_NUMBER|NAME|PHONE
+    # 2. Ticket number directly: KAYO-2025-0001
+    # 3. Delegate ID fallback: DELEGATE-123
+    search_value = qr_data
+    delegate = None
     
-    # Find delegate
-    delegate = Delegate.query.filter_by(ticket_number=ticket_number).first()
+    try:
+        if '|' in qr_data:
+            # Pipe-separated format
+            parts = qr_data.split('|')
+            search_value = parts[1] if len(parts) > 1 else qr_data
+        elif qr_data.startswith('DELEGATE-'):
+            # Fallback ID format from badges
+            try:
+                delegate_id = int(qr_data.replace('DELEGATE-', ''))
+                delegate = Delegate.query.get(delegate_id)
+            except ValueError:
+                pass
+    except:
+        search_value = qr_data
+    
+    # Find delegate by ticket number if not found by ID
+    if not delegate:
+        delegate = Delegate.query.filter_by(ticket_number=search_value).first()
     
     if not delegate:
-        # Try searching by ticket number directly
+        # Try searching by ticket number with various matches
         delegate = Delegate.query.filter(
             db.or_(
                 Delegate.ticket_number == qr_data,
-                Delegate.ticket_number.ilike(f'%{qr_data}%')
+                Delegate.ticket_number == search_value,
+                Delegate.ticket_number.ilike(f'%{search_value}%')
             )
         ).first()
     
