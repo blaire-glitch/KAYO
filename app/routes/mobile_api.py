@@ -32,6 +32,7 @@ from app.models.payment import Payment
 from app.models.event import Event, PricingTier
 from app.models.operations import CheckInRecord
 from app.models.permission_request import PermissionRequest
+from app.models.pending_delegate import PendingDelegate
 from app.church_data import CHURCH_DATA
 
 mobile_api_bp = Blueprint('mobile_api', __name__, url_prefix='/api/v1')
@@ -2358,6 +2359,307 @@ def change_password(user):
     })
 
 
+# ==================== PENDING DELEGATE REGISTRATION (Public Self-Registration) ====================
+
+@mobile_api_bp.route('/public/register', methods=['POST'])
+def public_register_delegate():
+    """
+    Public endpoint for delegate self-registration (no auth required).
+    Registration requires chairperson approval before becoming active.
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['name', 'archdeaconry', 'parish', 'local_church', 'gender']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        name = data.get('name', '').strip()
+        archdeaconry = data.get('archdeaconry', '').strip()
+        parish = data.get('parish', '').strip()
+        local_church = data.get('local_church', '').strip()
+        phone_number = data.get('phone_number', '').strip() or None
+        id_number = data.get('id_number', '').strip() or None
+        email = data.get('email', '').strip() or None
+        gender = data.get('gender', '').strip()
+        
+        # Check for duplicate pending registrations
+        if phone_number:
+            existing = PendingDelegate.query.filter_by(
+                phone_number=phone_number, 
+                status='pending'
+            ).first()
+            if existing:
+                return jsonify({
+                    'error': 'A registration with this phone number is already pending approval',
+                    'registration_token': existing.registration_token
+                }), 409
+        
+        if id_number:
+            existing = PendingDelegate.query.filter_by(
+                id_number=id_number,
+                status='pending'
+            ).first()
+            if existing:
+                return jsonify({
+                    'error': 'A registration with this ID number is already pending approval',
+                    'registration_token': existing.registration_token
+                }), 409
+            
+            # Check existing delegates
+            existing_delegate = Delegate.query.filter_by(id_number=id_number).first()
+            if existing_delegate:
+                return jsonify({
+                    'error': 'A delegate with this ID number is already registered'
+                }), 409
+        
+        # Get active event
+        event = Event.query.filter_by(is_active=True).first()
+        
+        # Create pending registration
+        pending = PendingDelegate(
+            registration_token=PendingDelegate.generate_token(),
+            name=name,
+            archdeaconry=archdeaconry,
+            parish=parish,
+            local_church=local_church,
+            phone_number=phone_number,
+            id_number=id_number,
+            email=email,
+            gender=gender,
+            category='delegate',
+            event_id=event.id if event else None,
+            status='pending'
+        )
+        
+        db.session.add(pending)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registration submitted successfully. Awaiting chairperson approval.',
+            'registration_token': pending.registration_token,
+            'status': 'pending',
+            'data': pending.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@mobile_api_bp.route('/public/registration-status/<token>', methods=['GET'])
+def public_registration_status(token):
+    """
+    Check the status of a pending registration (no auth required).
+    Use the registration_token received during registration.
+    """
+    pending = PendingDelegate.query.filter_by(registration_token=token).first()
+    
+    if not pending:
+        return jsonify({'error': 'Registration not found'}), 404
+    
+    response = {
+        'success': True,
+        'status': pending.status,
+        'registration': pending.to_dict()
+    }
+    
+    # If approved, include delegate info
+    if pending.status == 'approved' and pending.delegate_id:
+        delegate = Delegate.query.get(pending.delegate_id)
+        if delegate:
+            response['delegate'] = {
+                'id': delegate.id,
+                'ticket_number': delegate.ticket_number,
+                'name': delegate.name,
+                'is_paid': delegate.is_paid
+            }
+    
+    return jsonify(response)
+
+
+@mobile_api_bp.route('/pending-registrations', methods=['GET'])
+@token_required
+def get_pending_registrations(user):
+    """
+    Get pending registrations for approval (Chairs, Admins, Youth Ministers).
+    Youth ministers can only view, not approve.
+    """
+    if user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    pending_list = PendingDelegate.get_pending_for_user(user)
+    
+    return jsonify({
+        'success': True,
+        'can_approve': user.role != 'youth_minister',
+        'pending_count': len([p for p in pending_list if p.status == 'pending']),
+        'registrations': [p.to_dict() for p in pending_list]
+    })
+
+
+@mobile_api_bp.route('/pending-registrations/<int:id>', methods=['GET'])
+@token_required
+def get_pending_registration_detail(user, id):
+    """Get details of a specific pending registration"""
+    if user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    pending = PendingDelegate.query.get_or_404(id)
+    
+    return jsonify({
+        'success': True,
+        'registration': pending.to_dict()
+    })
+
+
+@mobile_api_bp.route('/pending-registrations/<int:id>/approve', methods=['POST'])
+@token_required
+def approve_pending_registration(user, id):
+    """Approve a pending registration (Chairs and Admins only)"""
+    if user.role not in ['chair', 'admin', 'super_admin']:
+        return jsonify({'error': 'Access denied. Only chairpersons and admins can approve registrations.'}), 403
+    
+    pending = PendingDelegate.query.get_or_404(id)
+    
+    # Verify the chair can approve this registration
+    if user.role == 'chair':
+        can_approve = False
+        if user.local_church and user.local_church.lower() == pending.local_church.lower():
+            can_approve = True
+        elif user.parish and user.parish.lower() == pending.parish.lower():
+            can_approve = True
+        elif user.archdeaconry and user.archdeaconry.lower() == pending.archdeaconry.lower():
+            can_approve = True
+        elif not user.local_church and not user.parish and not user.archdeaconry:
+            can_approve = True
+            
+        if not can_approve:
+            return jsonify({
+                'error': 'You can only approve registrations from your local church, parish, or archdeaconry.'
+            }), 403
+    
+    if pending.status != 'pending':
+        return jsonify({'error': 'This registration has already been processed.'}), 400
+    
+    try:
+        # Create the actual delegate
+        delegate = Delegate(
+            ticket_number=Delegate.generate_ticket_number(),
+            name=pending.name,
+            local_church=pending.local_church,
+            parish=pending.parish,
+            archdeaconry=pending.archdeaconry,
+            phone_number=pending.phone_number,
+            id_number=pending.id_number,
+            gender=pending.gender,
+            category=pending.category,
+            event_id=pending.event_id,
+            registered_by=user.id
+        )
+        
+        db.session.add(delegate)
+        db.session.flush()  # Get delegate ID
+        
+        # Update pending status
+        pending.status = 'approved'
+        pending.reviewed_at = datetime.utcnow()
+        pending.reviewed_by = user.id
+        pending.delegate_id = delegate.id
+        
+        data = request.get_json() or {}
+        pending.reviewer_notes = data.get('notes', '')
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Registration for {pending.name} has been approved.',
+            'delegate': {
+                'id': delegate.id,
+                'ticket_number': delegate.ticket_number,
+                'name': delegate.name
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@mobile_api_bp.route('/pending-registrations/<int:id>/reject', methods=['POST'])
+@token_required
+def reject_pending_registration(user, id):
+    """Reject a pending registration (Chairs and Admins only)"""
+    if user.role not in ['chair', 'admin', 'super_admin']:
+        return jsonify({'error': 'Access denied. Only chairpersons and admins can reject registrations.'}), 403
+    
+    pending = PendingDelegate.query.get_or_404(id)
+    
+    # Verify the chair can reject this registration
+    if user.role == 'chair':
+        can_reject = False
+        if user.local_church and user.local_church.lower() == pending.local_church.lower():
+            can_reject = True
+        elif user.parish and user.parish.lower() == pending.parish.lower():
+            can_reject = True
+        elif user.archdeaconry and user.archdeaconry.lower() == pending.archdeaconry.lower():
+            can_reject = True
+        elif not user.local_church and not user.parish and not user.archdeaconry:
+            can_reject = True
+            
+        if not can_reject:
+            return jsonify({
+                'error': 'You can only reject registrations from your local church, parish, or archdeaconry.'
+            }), 403
+    
+    if pending.status != 'pending':
+        return jsonify({'error': 'This registration has already been processed.'}), 400
+    
+    data = request.get_json() or {}
+    rejection_reason = data.get('rejection_reason', '').strip()
+    
+    if not rejection_reason:
+        return jsonify({'error': 'Rejection reason is required'}), 400
+    
+    try:
+        pending.status = 'rejected'
+        pending.reviewed_at = datetime.utcnow()
+        pending.reviewed_by = user.id
+        pending.rejection_reason = rejection_reason
+        pending.reviewer_notes = data.get('notes', '')
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Registration for {pending.name} has been rejected.'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@mobile_api_bp.route('/pending-registrations/count', methods=['GET'])
+@token_required
+def get_pending_count(user):
+    """Get count of pending registrations for the current user"""
+    if user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    pending_list = PendingDelegate.get_pending_for_user(user)
+    pending_count = len([p for p in pending_list if p.status == 'pending'])
+    
+    return jsonify({
+        'success': True,
+        'pending_count': pending_count
+    })
+
+
 # ==================== API DOCUMENTATION ====================
 
 @mobile_api_bp.route('/docs', methods=['GET'])
@@ -2418,6 +2720,34 @@ def api_documentation():
                     'description': 'Change password (requires auth)',
                     'body': {'current_password': 'string', 'new_password': 'string'}
                 }
+            },
+            'public_registration': {
+                'POST /public/register': {
+                    'description': 'Public delegate self-registration (no auth required)',
+                    'body': {
+                        'name': 'string (required)',
+                        'archdeaconry': 'string (required)',
+                        'parish': 'string (required)',
+                        'local_church': 'string (required)',
+                        'gender': 'string (required - Male/Female)',
+                        'phone_number': 'string (optional)',
+                        'id_number': 'string (optional)',
+                        'email': 'string (optional)'
+                    },
+                    'returns': 'registration_token for status checking'
+                },
+                'GET /public/registration-status/<token>': 'Check registration status (no auth required)',
+                'GET /pending-registrations': 'Get pending registrations for approval (Chair/Admin/Youth Minister)',
+                'GET /pending-registrations/<id>': 'Get pending registration details (Chair/Admin/Youth Minister)',
+                'POST /pending-registrations/<id>/approve': {
+                    'description': 'Approve registration (Chair/Admin only)',
+                    'body': {'notes': 'string (optional)'}
+                },
+                'POST /pending-registrations/<id>/reject': {
+                    'description': 'Reject registration (Chair/Admin only)',
+                    'body': {'rejection_reason': 'string (required)', 'notes': 'string (optional)'}
+                },
+                'GET /pending-registrations/count': 'Get pending count for current user (Chair/Admin/Youth Minister)'
             },
             'church_data': {
                 'GET /church/archdeaconries': 'Get list of all archdeaconries',
