@@ -99,25 +99,62 @@ class PendingDelegate(db.Model):
     def get_pending_for_user(user):
         """
         Get pending registrations that a user can approve.
-        - Admins see all
-        - Chairs see their local church
+        - Admins see all pending registrations
+        - Chairs see registrations from their local church, parish, or archdeaconry
         - Youth ministers see their archdeaconry (view only)
         """
+        from sqlalchemy import func
+        
         query = PendingDelegate.query.filter_by(status='pending')
         
         if user.role in ['admin', 'super_admin']:
+            # Admins see all pending registrations
             return query.order_by(PendingDelegate.submitted_at.desc()).all()
+        
         elif user.role == 'chair':
-            # Chairs see registrations from their local church
+            # Chairs see registrations matching their location hierarchy
+            # Priority: local_church > parish > archdeaconry
             if user.local_church:
-                return query.filter_by(local_church=user.local_church).order_by(
-                    PendingDelegate.submitted_at.desc()
-                ).all()
+                # Case-insensitive match on local church
+                results = query.filter(
+                    func.lower(PendingDelegate.local_church) == func.lower(user.local_church)
+                ).order_by(PendingDelegate.submitted_at.desc()).all()
+                if results:
+                    return results
+            
+            if user.parish:
+                # Fall back to parish if no local church match
+                results = query.filter(
+                    func.lower(PendingDelegate.parish) == func.lower(user.parish)
+                ).order_by(PendingDelegate.submitted_at.desc()).all()
+                if results:
+                    return results
+            
+            if user.archdeaconry:
+                # Fall back to archdeaconry if no parish match
+                results = query.filter(
+                    func.lower(PendingDelegate.archdeaconry) == func.lower(user.archdeaconry)
+                ).order_by(PendingDelegate.submitted_at.desc()).all()
+                if results:
+                    return results
+            
+            # If chair has no location set, show all (they need to set their profile)
+            if not user.local_church and not user.parish and not user.archdeaconry:
+                return query.order_by(PendingDelegate.submitted_at.desc()).all()
+        
         elif user.role == 'youth_minister':
             # Youth ministers see their archdeaconry (view only)
             if user.archdeaconry:
-                return query.filter_by(archdeaconry=user.archdeaconry).order_by(
-                    PendingDelegate.submitted_at.desc()
-                ).all()
+                return query.filter(
+                    func.lower(PendingDelegate.archdeaconry) == func.lower(user.archdeaconry)
+                ).order_by(PendingDelegate.submitted_at.desc()).all()
+            # If no archdeaconry set, show all from their parish or all
+            if user.parish:
+                return query.filter(
+                    func.lower(PendingDelegate.parish) == func.lower(user.parish)
+                ).order_by(PendingDelegate.submitted_at.desc()).all()
+            # Fallback: show all if no location set
+            if not user.archdeaconry and not user.parish:
+                return query.order_by(PendingDelegate.submitted_at.desc()).all()
         
         return []

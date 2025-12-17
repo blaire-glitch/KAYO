@@ -170,10 +170,22 @@ def approve_registration(id):
     
     pending = PendingDelegate.query.get_or_404(id)
     
-    # Verify the chair can approve this registration
+    # Verify the chair can approve this registration (flexible matching)
     if current_user.role == 'chair':
-        if pending.local_church != current_user.local_church:
-            flash('You can only approve registrations from your local church.', 'danger')
+        can_approve = False
+        # Check if any of the chair's locations match the pending delegate
+        if current_user.local_church and current_user.local_church.lower() == pending.local_church.lower():
+            can_approve = True
+        elif current_user.parish and current_user.parish.lower() == pending.parish.lower():
+            can_approve = True
+        elif current_user.archdeaconry and current_user.archdeaconry.lower() == pending.archdeaconry.lower():
+            can_approve = True
+        # If chair has no location set, allow approval (they need to set their profile)
+        elif not current_user.local_church and not current_user.parish and not current_user.archdeaconry:
+            can_approve = True
+            
+        if not can_approve:
+            flash('You can only approve registrations from your local church, parish, or archdeaconry.', 'danger')
             return redirect(url_for('public.pending_approvals'))
     
     if pending.status != 'pending':
