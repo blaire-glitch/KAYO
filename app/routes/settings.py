@@ -1,6 +1,6 @@
 from functools import wraps
 from datetime import datetime
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app import db
 from app.models import AuditLog, Role, User, PERMISSIONS
@@ -250,3 +250,137 @@ def toggle_user_active(user_id):
     db.session.commit()
     flash(f'User {user.email} {"activated" if user.is_active else "deactivated"}!', 'success')
     return redirect(url_for('settings.list_users'))
+
+
+# ==================== M-PESA CONFIGURATION ====================
+
+@settings_bp.route('/mpesa')
+@login_required
+@super_admin_required
+def mpesa_settings():
+    """M-Pesa configuration page"""
+    # Get current configuration (masked)
+    config = {
+        'consumer_key': _mask_value(current_app.config.get('MPESA_CONSUMER_KEY')),
+        'consumer_secret': _mask_value(current_app.config.get('MPESA_CONSUMER_SECRET')),
+        'shortcode': current_app.config.get('MPESA_SHORTCODE') or 'Not configured',
+        'passkey': _mask_value(current_app.config.get('MPESA_PASSKEY')),
+        'callback_url': current_app.config.get('MPESA_CALLBACK_URL') or 'Not configured',
+        'environment': current_app.config.get('MPESA_ENV', 'sandbox'),
+        'is_configured': _is_mpesa_configured()
+    }
+    
+    return render_template('settings/mpesa.html', config=config)
+
+
+@settings_bp.route('/mpesa/test', methods=['POST'])
+@login_required
+@super_admin_required
+def test_mpesa_connection():
+    """Test M-Pesa API connection"""
+    if not _is_mpesa_configured():
+        return jsonify({
+            'success': False,
+            'error': 'M-Pesa is not fully configured. Please set all required environment variables.'
+        })
+    
+    try:
+        from app.services.mpesa import MpesaAPI
+        mpesa = MpesaAPI()
+        access_token = mpesa.get_access_token()
+        
+        if access_token:
+            current_user.log_activity('test', 'mpesa', None, 'Tested M-Pesa API connection - Success')
+            return jsonify({
+                'success': True,
+                'message': 'Successfully connected to M-Pesa API!',
+                'environment': current_app.config.get('MPESA_ENV', 'sandbox')
+            })
+        else:
+            current_user.log_activity('test', 'mpesa', None, 'Tested M-Pesa API connection - Failed')
+            return jsonify({
+                'success': False,
+                'error': 'Failed to get access token. Check your Consumer Key and Secret.'
+            })
+    except Exception as e:
+        current_app.logger.error(f"M-Pesa test error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Connection error: {str(e)}'
+        })
+
+
+@settings_bp.route('/mpesa/test-stk', methods=['POST'])
+@login_required
+@super_admin_required
+def test_stk_push():
+    """Test STK Push with a small amount"""
+    if not _is_mpesa_configured():
+        return jsonify({
+            'success': False,
+            'error': 'M-Pesa is not fully configured.'
+        })
+    
+    data = request.get_json()
+    phone_number = data.get('phone_number')
+    
+    if not phone_number:
+        return jsonify({
+            'success': False,
+            'error': 'Phone number is required'
+        })
+    
+    try:
+        from app.services.mpesa import MpesaAPI
+        mpesa = MpesaAPI()
+        
+        # Test with 1 KES (minimum amount)
+        response = mpesa.stk_push(
+            phone_number=phone_number,
+            amount=1,
+            account_reference="KAYO-TEST",
+            transaction_desc="KAYO System Test"
+        )
+        
+        if 'error' in response:
+            current_user.log_activity('test', 'mpesa', None, f'STK Push test failed: {response["error"]}')
+            return jsonify({
+                'success': False,
+                'error': response['error']
+            })
+        
+        current_user.log_activity('test', 'mpesa', None, f'STK Push test sent to {phone_number}')
+        return jsonify({
+            'success': True,
+            'message': f'STK Push sent to {phone_number}! Check your phone.',
+            'checkout_request_id': response.get('CheckoutRequestID'),
+            'response_code': response.get('ResponseCode'),
+            'response_description': response.get('ResponseDescription')
+        })
+    except Exception as e:
+        current_app.logger.error(f"STK Push test error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Error: {str(e)}'
+        })
+
+
+def _mask_value(value):
+    """Mask sensitive values for display"""
+    if not value:
+        return 'Not configured'
+    if len(value) <= 8:
+        return '*' * len(value)
+    return value[:4] + '*' * (len(value) - 8) + value[-4:]
+
+
+def _is_mpesa_configured():
+    """Check if all required M-Pesa config is present"""
+    required = [
+        'MPESA_CONSUMER_KEY',
+        'MPESA_CONSUMER_SECRET', 
+        'MPESA_SHORTCODE',
+        'MPESA_PASSKEY',
+        'MPESA_CALLBACK_URL'
+    ]
+    return all(current_app.config.get(key) for key in required)
