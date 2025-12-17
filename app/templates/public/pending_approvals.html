@@ -117,11 +117,11 @@
                                 </a>
                                 {% if can_approve and pending.status == 'pending' %}
                                 <button type="button" class="btn btn-sm btn-outline-success" 
-                                        title="Approve" onclick="approveRegistration({{ pending.id }}, '{{ pending.name }}')">
+                                        title="Approve" onclick="approveRegistration({{ pending.id }}, '{{ pending.name|replace("'", "\\'") }}')">
                                     <i class="bi bi-check-lg"></i>
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-danger" 
-                                        title="Reject" onclick="rejectRegistration({{ pending.id }}, '{{ pending.name }}')">
+                                        title="Reject" onclick="rejectRegistration({{ pending.id }}, '{{ pending.name|replace("'", "\\'") }}')">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
                                 {% endif %}
@@ -207,32 +207,40 @@
 
 {% block extra_js %}
 <script>
-function copyLink() {
-    const input = document.getElementById('publicLink');
-    input.select();
-    navigator.clipboard.writeText(input.value).then(function() {
-        const btn = input.nextElementSibling;
-        btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
-        btn.classList.remove('btn-outline-primary');
-        btn.classList.add('btn-success');
-        setTimeout(function() {
-            btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
-            btn.classList.remove('btn-success');
-            btn.classList.add('btn-outline-primary');
-        }, 2000);
-    });
-}
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Copy link function
+    window.copyLink = function() {
+        const input = document.getElementById('publicLink');
+        if (input) {
+            input.select();
+            navigator.clipboard.writeText(input.value).then(function() {
+                const btn = input.nextElementSibling;
+                btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-success');
+                setTimeout(function() {
+                    btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 2000);
+            });
+        }
+    };
 
-function approveRegistration(id, name) {
-    document.getElementById('approveName').textContent = name;
-    document.getElementById('approveForm').action = '/register/approvals/' + id + '/approve';
-    new bootstrap.Modal(document.getElementById('approveModal')).show();
-}
+    // Approve registration function
+    window.approveRegistration = function(id, name) {
+        document.getElementById('approveName').textContent = name;
+        document.getElementById('approveForm').action = '/register/approvals/' + id + '/approve';
+        new bootstrap.Modal(document.getElementById('approveModal')).show();
+    };
 
-function rejectRegistration(id, name) {
-    document.getElementById('rejectName').textContent = name;
-    document.getElementById('rejectForm').action = '/register/approvals/' + id + '/reject';
-    new bootstrap.Modal(document.getElementById('rejectModal')).show();
-}
+    // Reject registration function
+    window.rejectRegistration = function(id, name) {
+        document.getElementById('rejectName').textContent = name;
+        document.getElementById('rejectForm').action = '/register/approvals/' + id + '/reject';
+        new bootstrap.Modal(document.getElementById('rejectModal')).show();
+    };
+});
 </script>
 {% endblock %}
