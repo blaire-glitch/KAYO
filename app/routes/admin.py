@@ -179,6 +179,50 @@ def admin_delete_delegate(id):
     return redirect(url_for('admin.all_delegates'))
 
 
+@admin_bp.route('/delegates/bulk-delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_delegates():
+    """Bulk delete delegates from admin panel"""
+    delegate_ids = request.form.getlist('delegate_ids', type=int)
+    
+    if not delegate_ids:
+        flash('No delegates selected for deletion.', 'warning')
+        return redirect(url_for('admin.all_delegates'))
+    
+    try:
+        deleted_count = 0
+        skipped_count = 0
+        
+        for delegate_id in delegate_ids:
+            delegate = Delegate.query.get(delegate_id)
+            if delegate:
+                # Unlink from payment (don't delete payment as it may cover other delegates)
+                delegate.payment_id = None
+                
+                # Delete check-in records
+                CheckInRecord.query.filter_by(delegate_id=delegate_id).delete()
+                
+                # Delete the delegate
+                db.session.delete(delegate)
+                deleted_count += 1
+            else:
+                skipped_count += 1
+        
+        db.session.commit()
+        
+        if deleted_count > 0:
+            flash(f'Successfully deleted {deleted_count} delegate(s).', 'success')
+        if skipped_count > 0:
+            flash(f'{skipped_count} delegate(s) were not found and skipped.', 'info')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting delegates: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.all_delegates'))
+
+
 @admin_bp.route('/users/create', methods=['GET', 'POST'])
 @login_required
 @admin_required

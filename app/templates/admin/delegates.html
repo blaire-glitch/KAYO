@@ -75,10 +75,27 @@
 <div class="card">
     <div class="card-body">
         {% if delegates.items %}
+        <!-- Bulk Actions -->
+        <form id="bulkDeleteForm" action="{{ url_for('admin.bulk_delete_delegates') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selectAll">
+                        <label class="form-check-label" for="selectAll">Select All</label>
+                    </div>
+                    <span id="selectedCount" class="text-muted small">(0 selected)</span>
+                </div>
+                <button type="submit" class="btn btn-danger" id="bulkDeleteBtn" disabled onclick="return confirm('Are you sure you want to delete the selected delegates? This cannot be undone.');">
+                    <i class="bi bi-trash me-1"></i>Delete Selected
+                </button>
+            </div>
+        
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
                     <tr>
+                        <th style="width: 40px;"></th>
                         <th>#</th>
                         <th>Name</th>
                         <th>Gender</th>
@@ -94,6 +111,11 @@
                 <tbody>
                     {% for delegate in delegates.items %}
                     <tr>
+                        <td>
+                            <div class="form-check">
+                                <input class="form-check-input delegate-checkbox" type="checkbox" name="delegate_ids" value="{{ delegate.id }}">
+                            </div>
+                        </td>
                         <td>{{ loop.index + (delegates.page - 1) * delegates.per_page }}</td>
                         <td><strong>{{ delegate.name }}</strong></td>
                         <td>{{ delegate.gender | capitalize }}</td>
@@ -122,6 +144,8 @@
                 </tbody>
             </table>
         </div>
+        
+        </form>
         
         <!-- Pagination -->
         {% if delegates.pages > 1 %}
@@ -162,4 +186,48 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const delegateCheckboxes = document.querySelectorAll('.delegate-checkbox');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    
+    function updateSelectedCount() {
+        const checkedCount = document.querySelectorAll('.delegate-checkbox:checked').length;
+        selectedCountSpan.textContent = `(${checkedCount} selected)`;
+        bulkDeleteBtn.disabled = checkedCount === 0;
+        
+        // Update select all checkbox state
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCount === delegateCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+    
+    // Select All checkbox handler
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            delegateCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateSelectedCount();
+        });
+    }
+    
+    // Individual checkbox handlers
+    delegateCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+});
+</script>
 {% endblock %}
