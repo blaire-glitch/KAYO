@@ -132,12 +132,12 @@
                         </td>
                         <td>{{ delegate.registered_at.strftime('%d %b %Y') }}</td>
                         <td>
-                            <form action="{{ url_for('admin.admin_delete_delegate', id=delegate.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete {{ delegate.name }}? This cannot be undone.');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger delete-single-btn" 
+                                    data-delegate-id="{{ delegate.id }}" 
+                                    data-delegate-name="{{ delegate.name }}" 
+                                    title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -145,6 +145,11 @@
             </table>
         </div>
         
+        </form>
+        
+        <!-- Hidden form for single delegate deletion (outside bulk form to avoid nesting) -->
+        <form id="singleDeleteForm" method="POST" style="display: none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         </form>
         
         <!-- Pagination -->
@@ -195,6 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const delegateCheckboxes = document.querySelectorAll('.delegate-checkbox');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
     const selectedCountSpan = document.getElementById('selectedCount');
+    const singleDeleteForm = document.getElementById('singleDeleteForm');
     
     function updateSelectedCount() {
         const checkedCount = document.querySelectorAll('.delegate-checkbox:checked').length;
@@ -227,6 +233,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Individual checkbox handlers
     delegateCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Single delete button handlers
+    document.querySelectorAll('.delete-single-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const delegateId = this.dataset.delegateId;
+            const delegateName = this.dataset.delegateName;
+            
+            if (confirm(`Are you sure you want to delete ${delegateName}? This cannot be undone.`)) {
+                singleDeleteForm.action = `/admin/delegates/${delegateId}/delete`;
+                singleDeleteForm.submit();
+            }
+        });
     });
 });
 </script>
