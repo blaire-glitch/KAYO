@@ -373,33 +373,55 @@
     <!-- Parish/Archdeaconry Script -->
     <script>
         const parishData = {
-            'Amagoro': ['Amagoro', 'Kamolo', 'Kakapel', 'Osajai', 'Okatekok'],
-            'Angurai': ['Angurai', 'Moding', 'Obekai', 'Ikapolok'],
-            'Budalangi': ['Budalangi', 'Mudembi', 'Mundere', 'Rukala', 'Siginga'],
-            'Busia': ['Busia Township', 'Nambale', 'Lwanya', 'Munongo', 'Nasewa'],
-            'Butula': ['Butula', 'Bumala A', 'Bumala B', 'Kingandole', 'Elukhari'],
-            'Funyula': ['Funyula', 'Nangina', 'Namboboto', 'Sifuyo', 'Odiado'],
-            'Matayos': ['Matayos', 'Bujumba', 'Mayenje', 'Burumba'],
-            'Teso North': ['Malaba', 'Kolanya', 'Amagoro Town', 'Chakol'],
-            'Teso South': ['Amukura', 'Angorom', 'Apokor', 'Kotur']
+            'Nambale Archdeaconry': ['Nasira Parish', 'St Thomas Nambale Cathedral Parish', 'Malanga Parish', 'Ebuwanga Parish', 'Emaduwa Parish', 'Buloma Parish'],
+            'Namaindi Archdeaconry': ['Namaindi Parish', 'Mulwakari Parish', 'Kaludeka Parish'],
+            'Khasoko Archdeaconry': ['Khasoko Parish', 'Sikinga Parish', 'Mungore Parish', 'Namusasi Parish', 'Lupida Parish'],
+            'Lugulu Archdeaconry': ['Lugulu Parish', 'Buduma Parish', 'Bukuyudi Parish', 'Emasinde Parish'],
+            'Bukhalalire Archdeaconry': ['Bukhalalire Parish', 'Bumutiru Parish', 'Simuli Parish', 'Busiada Parish'],
+            'Bujumba Archdeaconry': ['Bujumba Parish', 'Igula Parish', 'Bumala Parish', 'Dadira Parish'],
+            'Busende Archdeaconry': ['Busende Parish', 'Nasewa Parish', 'Budokomi Parish', 'Burumba Parish', 'Mayenje Parish', 'Mundaya Parish', "Bugeng'i Parish", 'Emaseno Parish'],
+            'Busia Archdeaconry': ["St. Stephen's Busia Parish"],
+            'Namboboto Archdeaconry': ['Namboboto Parish', 'Busibi Parish', 'Funyula Parish', 'Odiado Parish', 'Nyakwaka Parish', 'Luchululo Parish', 'Lugala Parish', 'Nyakhobi Parish', 'Wakhungu Parish'],
+            'Sigalame Archdeaconry': ['Sigalame Parish', 'Nandereka Parish', 'Namahudu Parish', 'Neyayo Parish', 'Namasari Parish'],
+            'Lugare Archdeaconry': ['Port-Victoria Parish', 'Lugare Parish', 'Osieko Parish', 'Budalangi Parish']
         };
         
         const archdeaconrySelect = document.getElementById('archdeaconry');
         const parishSelect = document.getElementById('parish');
         
         if (archdeaconrySelect && parishSelect) {
+            // Store the currently selected parish value (for form resubmission)
+            const currentParish = parishSelect.value;
+            
             archdeaconrySelect.addEventListener('change', function() {
                 const archdeaconry = this.value;
                 const parishes = parishData[archdeaconry] || [];
                 
                 parishSelect.innerHTML = '<option value="">Select Parish</option>';
-                parishes.forEach(parish => {
+                parishes.sort().forEach(parish => {
                     const option = document.createElement('option');
                     option.value = parish;
                     option.textContent = parish;
                     parishSelect.appendChild(option);
                 });
             });
+            
+            // Trigger change event on page load if archdeaconry is already selected
+            if (archdeaconrySelect.value) {
+                const archdeaconry = archdeaconrySelect.value;
+                const parishes = parishData[archdeaconry] || [];
+                
+                parishSelect.innerHTML = '<option value="">Select Parish</option>';
+                parishes.sort().forEach(parish => {
+                    const option = document.createElement('option');
+                    option.value = parish;
+                    option.textContent = parish;
+                    if (parish === currentParish) {
+                        option.selected = true;
+                    }
+                    parishSelect.appendChild(option);
+                });
+            }
         }
     </script>
 </body>
