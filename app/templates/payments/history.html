@@ -3,9 +3,19 @@
 {% block title %}Payment History - KAYO{% endblock %}
 
 {% block content %}
-<div class="mb-4 mt-3">
-    <h2><i class="bi bi-clock-history me-2"></i>Payment History</h2>
-    <p class="text-muted">View all your payment transactions</p>
+<div class="d-flex justify-content-between align-items-center mb-4 mt-3">
+    <div>
+        <h2><i class="bi bi-clock-history me-2"></i>Payment History</h2>
+        <p class="text-muted mb-0">View all your payment transactions</p>
+    </div>
+    {% if payments.items %}
+    <form action="{{ url_for('payments.clear_history') }}" method="POST" onsubmit="return confirm('Are you sure you want to clear all failed and pending payment records? Completed payments will NOT be deleted.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger">
+            <i class="bi bi-trash me-1"></i>Clear Failed/Pending
+        </button>
+    </form>
+    {% endif %}
 </div>
 
 <div class="card">

@@ -505,3 +505,23 @@ def payment_history():
     )
     
     return render_template('payments/history.html', payments=payments)
+
+
+@payments_bp.route('/history/clear', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear payment history for current user (only failed/cancelled payments)"""
+    # Only delete failed or cancelled payments, not completed ones
+    deleted_count = Payment.query.filter(
+        Payment.user_id == current_user.id,
+        Payment.status.in_(['failed', 'cancelled', 'pending'])
+    ).delete(synchronize_session=False)
+    
+    db.session.commit()
+    
+    if deleted_count > 0:
+        flash(f'Cleared {deleted_count} failed/pending payment records.', 'success')
+    else:
+        flash('No failed or pending payments to clear.', 'info')
+    
+    return redirect(url_for('payments.payment_history'))
