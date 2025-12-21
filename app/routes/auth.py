@@ -5,7 +5,8 @@ import requests
 import secrets
 from app import db
 from app.models.user import User
-from app.forms import LoginForm, RegistrationForm
+from app.forms import LoginForm, RegistrationForm, OTPVerificationForm
+from app.utils.email import send_otp_email
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -25,16 +26,31 @@ def login():
                 flash('Your account has been deactivated. Please contact admin.', 'danger')
                 return redirect(url_for('auth.login'))
             
-            # Update last login
-            user.last_login = datetime.utcnow()
+            # Check if OTP is required for this user (chairs only)
+            otp_required = current_app.config.get('OTP_REQUIRED_FOR_CHAIRS', True)
+            if otp_required and user.role == 'chair':
+                # Generate and send OTP
+                otp_code = user.generate_otp()
+                db.session.commit()
+                
+                success, message = send_otp_email(user, otp_code)
+                if success:
+                    # Store user ID in session for OTP verification
+                    session['otp_user_id'] = user.id
+                    session['otp_next'] = request.args.get('next')
+                    flash(f'A verification code has been sent to {user.email}. Please check your email.', 'info')
+                    return redirect(url_for('auth.verify_otp'))
+                else:
+                    # If email fails, log them in anyway with a warning
+                    current_app.logger.error(f"OTP email failed for {user.email}: {message}")
+                    flash('Email verification unavailable. Proceeding with login.', 'warning')
             
-            # Generate new session token (invalidates other sessions)
+            # Direct login for non-chair users or if OTP not required
+            user.last_login = datetime.utcnow()
             token = user.generate_session_token()
             db.session.commit()
             
             login_user(user)
-            
-            # Store session token in browser session
             session['session_token'] = token
             
             next_page = request.args.get('next')
@@ -44,6 +60,74 @@ def login():
             flash('Invalid email or password.', 'danger')
     
     return render_template('auth/login.html', form=form)
+
+
+@auth_bp.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    """Verify OTP for chair login"""
+    # Check if we have a pending OTP verification
+    user_id = session.get('otp_user_id')
+    if not user_id:
+        flash('No pending verification. Please login again.', 'warning')
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.get(user_id)
+    if not user:
+        session.pop('otp_user_id', None)
+        flash('User not found. Please login again.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    form = OTPVerificationForm()
+    if form.validate_on_submit():
+        otp_code = form.otp.data.strip()
+        
+        if user.verify_otp(otp_code):
+            # OTP verified - complete login
+            user.clear_otp()
+            user.last_login = datetime.utcnow()
+            token = user.generate_session_token()
+            db.session.commit()
+            
+            login_user(user)
+            session['session_token'] = token
+            
+            # Clear OTP session data
+            next_page = session.pop('otp_next', None)
+            session.pop('otp_user_id', None)
+            
+            flash(f'Welcome back, {user.name}!', 'success')
+            return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
+        else:
+            flash('Invalid or expired verification code. Please try again.', 'danger')
+    
+    return render_template('auth/verify_otp.html', form=form, user=user)
+
+
+@auth_bp.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    """Resend OTP to user's email"""
+    user_id = session.get('otp_user_id')
+    if not user_id:
+        flash('No pending verification. Please login again.', 'warning')
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.get(user_id)
+    if not user:
+        session.pop('otp_user_id', None)
+        flash('User not found. Please login again.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    # Generate new OTP
+    otp_code = user.generate_otp()
+    db.session.commit()
+    
+    success, message = send_otp_email(user, otp_code)
+    if success:
+        flash(f'A new verification code has been sent to {user.email}.', 'info')
+    else:
+        flash('Failed to send verification code. Please try again.', 'danger')
+    
+    return redirect(url_for('auth.verify_otp'))
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])

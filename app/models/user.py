@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import secrets
+import random
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from flask import session
@@ -26,6 +27,10 @@ class User(UserMixin, db.Model):
     
     # Session management - for single session restriction
     session_token = db.Column(db.String(64), nullable=True)
+    
+    # OTP fields for login verification
+    otp_code = db.Column(db.String(6), nullable=True)
+    otp_expires_at = db.Column(db.DateTime, nullable=True)
     
     # Google OAuth fields
     google_id = db.Column(db.String(100), unique=True, nullable=True)
@@ -57,6 +62,25 @@ class User(UserMixin, db.Model):
     def verify_session_token(self, token):
         """Verify if the provided session token matches"""
         return self.session_token == token
+    
+    def generate_otp(self):
+        """Generate a 6-digit OTP for email verification"""
+        self.otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        self.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+        return self.otp_code
+    
+    def verify_otp(self, otp):
+        """Verify if the provided OTP is valid and not expired"""
+        if not self.otp_code or not self.otp_expires_at:
+            return False
+        if datetime.utcnow() > self.otp_expires_at:
+            return False
+        return self.otp_code == otp
+    
+    def clear_otp(self):
+        """Clear OTP after successful verification"""
+        self.otp_code = None
+        self.otp_expires_at = None
     
     def is_admin(self):
         return self.role == 'admin' or self.role == 'super_admin'

@@ -37,6 +37,15 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Login')
 
 
+class OTPVerificationForm(FlaskForm):
+    """Form for OTP verification during login"""
+    otp = StringField('Verification Code', validators=[
+        DataRequired(message='Please enter the verification code'),
+        Length(min=6, max=6, message='Verification code must be 6 digits')
+    ], render_kw={"placeholder": "Enter 6-digit code", "maxlength": "6", "autocomplete": "one-time-code"})
+    submit = SubmitField('Verify')
+
+
 class RegistrationForm(FlaskForm):
     name = StringField('Full Name', validators=[DataRequired(), Length(min=2, max=100)])
     email = StringField('Email', validators=[DataRequired(), Email()])

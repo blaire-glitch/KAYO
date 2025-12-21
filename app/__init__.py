@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
+from flask_mail import Mail
 from config import Config
 
 # Optional CORS import for mobile API
@@ -18,6 +19,7 @@ login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
 csrf = CSRFProtect()
+mail = Mail()
 
 
 def create_app(config_class=Config):
@@ -28,6 +30,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
+    mail.init_app(app)
     
     # Enable CORS for mobile API endpoints
     if HAS_CORS:
