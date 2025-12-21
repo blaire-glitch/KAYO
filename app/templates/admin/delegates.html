@@ -193,7 +193,7 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('selectAll');
@@ -201,6 +201,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
     const selectedCountSpan = document.getElementById('selectedCount');
     const singleDeleteForm = document.getElementById('singleDeleteForm');
+    
+    // Exit early if no delegates on page
+    if (!selectAllCheckbox || delegateCheckboxes.length === 0) {
+        return;
+    }
     
     function updateSelectedCount() {
         const checkedCount = document.querySelectorAll('.delegate-checkbox:checked').length;
@@ -221,14 +226,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Select All checkbox handler
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            delegateCheckboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-            updateSelectedCount();
+    selectAllCheckbox.addEventListener('change', function() {
+        delegateCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
         });
-    }
+        updateSelectedCount();
+    });
     
     // Individual checkbox handlers
     delegateCheckboxes.forEach(checkbox => {
@@ -237,16 +240,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Single delete button handlers
     document.querySelectorAll('.delete-single-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
             const delegateId = this.dataset.delegateId;
             const delegateName = this.dataset.delegateName;
             
-            if (confirm(`Are you sure you want to delete ${delegateName}? This cannot be undone.`)) {
-                singleDeleteForm.action = `/admin/delegates/${delegateId}/delete`;
+            if (confirm('Are you sure you want to delete ' + delegateName + '? This cannot be undone.')) {
+                singleDeleteForm.action = '/admin/delegates/' + delegateId + '/delete';
                 singleDeleteForm.submit();
             }
         });
     });
+    
+    console.log('Delegates page JS initialized. Checkboxes found:', delegateCheckboxes.length);
 });
 </script>
 {% endblock %}
