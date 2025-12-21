@@ -8,6 +8,7 @@
         <h2><i class="bi bi-people me-2"></i>My Delegates</h2>
         <p class="text-muted mb-0">{{ delegates.total }} delegate(s) registered</p>
     </div>
+    {% if current_user.role != 'viewer' %}
     <div class="btn-group">
         <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
             <i class="bi bi-person-plus me-2"></i>Register
@@ -16,6 +17,7 @@
             <i class="bi bi-cloud-upload me-2"></i>Bulk Upload
         </a>
     </div>
+    {% endif %}
 </div>
 
 <div class="card">
@@ -65,7 +67,7 @@
                                 <a href="{{ url_for('delegates.view_ticket', id=delegate.id) }}" class="btn btn-sm btn-outline-primary" title="Ticket">
                                     <i class="bi bi-ticket-perforated"></i>
                                 </a>
-                                {% if not delegate.is_paid %}
+                                {% if not delegate.is_paid and current_user.role != 'viewer' %}
                                 <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-sm btn-outline-warning" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
