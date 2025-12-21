@@ -525,3 +525,26 @@ def clear_history():
         flash('No failed or pending payments to clear.', 'info')
     
     return redirect(url_for('payments.payment_history'))
+
+
+@payments_bp.route('/history/<int:payment_id>/delete', methods=['POST'])
+@login_required
+def delete_payment(payment_id):
+    """Delete a specific payment record"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Check permission - users can delete their own, admins can delete any
+    if payment.user_id != current_user.id and current_user.role not in ['admin', 'super_admin']:
+        flash('You do not have permission to delete this payment.', 'error')
+        return redirect(url_for('payments.payment_history'))
+    
+    # Only allow deleting non-completed payments for regular users
+    if payment.status == 'completed' and current_user.role not in ['admin', 'super_admin']:
+        flash('Cannot delete completed payments. Contact admin.', 'error')
+        return redirect(url_for('payments.payment_history'))
+    
+    db.session.delete(payment)
+    db.session.commit()
+    
+    flash('Payment record deleted.', 'success')
+    return redirect(url_for('payments.payment_history'))

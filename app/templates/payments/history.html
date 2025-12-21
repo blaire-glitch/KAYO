@@ -50,9 +50,19 @@
                             </span>
                         </td>
                         <td>
-                            <a href="{{ url_for('payments.payment_status', payment_id=payment.id) }}" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-eye"></i>
-                            </a>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('payments.payment_status', payment_id=payment.id) }}" class="btn btn-outline-secondary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if payment.status != 'completed' or current_user.role in ['admin', 'super_admin'] %}
+                                <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this payment record?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
