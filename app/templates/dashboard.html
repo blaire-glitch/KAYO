@@ -31,6 +31,11 @@
         --viewer-gray: #6B7280;
     }
     
+    /* DYO Stats Colors */
+    .text-purple { color: #7C3AED !important; }
+    .stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    
     /* Welcome Card Base */
     .welcome-card {
         border-radius: 16px;
@@ -352,7 +357,7 @@
 
 <!-- Stats Cards -->
 <div class="row mb-4">
-    <div class="col-md-4 mb-3">
+    <div class="col-md-{% if is_dyo %}3{% else %}4{% endif %} mb-3">
         <div class="card stat-card">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -366,7 +371,7 @@
         </div>
     </div>
     
-    <div class="col-md-4 mb-3">
+    <div class="col-md-{% if is_dyo %}3{% else %}4{% endif %} mb-3">
         <div class="card stat-card">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -380,7 +385,7 @@
         </div>
     </div>
     
-    <div class="col-md-4 mb-3">
+    <div class="col-md-{% if is_dyo %}3{% else %}4{% endif %} mb-3">
         <div class="card stat-card">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -393,7 +398,224 @@
             </div>
         </div>
     </div>
+    
+    {% if is_dyo %}
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-value text-info">{{ checked_in }}</div>
+                    <div class="stat-label">Checked In</div>
+                </div>
+                <div class="stat-icon text-info">
+                    <i class="bi bi-qr-code-scan"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+{% if is_dyo %}
+<!-- DYO Additional Stats Row -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card bg-gradient" style="background: linear-gradient(135deg, #065F46 0%, #047857 100%); color: white;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-value">KSh {{ "{:,.0f}".format(total_collected or 0) }}</div>
+                    <div class="stat-label" style="color: rgba(255,255,255,0.8);">Total Collected</div>
+                </div>
+                <div class="stat-icon" style="color: rgba(255,255,255,0.5);">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-value text-warning">{{ total_users }}</div>
+                    <div class="stat-label">Registered Chairs</div>
+                </div>
+                <div class="stat-icon text-warning">
+                    <i class="bi bi-person-workspace"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    {% set payment_rate = (paid_delegates / total_delegates * 100) if total_delegates > 0 else 0 %}
+                    <div class="stat-value text-purple">{{ "%.1f"|format(payment_rate) }}%</div>
+                    <div class="stat-label">Payment Rate</div>
+                </div>
+                <div class="stat-icon text-purple">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DYO Charts Row -->
+<div class="row mb-4">
+    <!-- Archdeaconry Stats -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-building me-2"></i>By Archdeaconry</h5>
+            </div>
+            <div class="card-body">
+                {% if archdeaconry_stats %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Archdeaconry</th>
+                                <th class="text-center">Total</th>
+                                <th class="text-center">Paid</th>
+                                <th class="text-center">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in archdeaconry_stats %}
+                            <tr>
+                                <td>{{ stat.archdeaconry or 'Unknown' }}</td>
+                                <td class="text-center">{{ stat.total }}</td>
+                                <td class="text-center text-success">{{ stat.paid }}</td>
+                                <td class="text-center">
+                                    {% set pct = (stat.paid / stat.total * 100) if stat.total > 0 else 0 %}
+                                    <span class="badge bg-{{ 'success' if pct >= 80 else 'warning' if pct >= 50 else 'danger' }}">
+                                        {{ "%.0f"|format(pct) }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-3">No data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gender Stats -->
+    <div class="col-lg-3 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-gender-ambiguous me-2"></i>By Gender</h5>
+            </div>
+            <div class="card-body">
+                {% if gender_stats %}
+                <div class="text-center">
+                    {% for stat in gender_stats %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span>{{ stat.gender | capitalize if stat.gender else 'Unknown' }}</span>
+                            <strong>{{ stat.count }}</strong>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            {% set pct = (stat.count / total_delegates * 100) if total_delegates > 0 else 0 %}
+                            <div class="progress-bar bg-{{ 'primary' if stat.gender == 'male' else 'danger' if stat.gender == 'female' else 'secondary' }}" 
+                                 style="width: {{ pct }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-3">No data</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Stats -->
+    <div class="col-lg-3 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-tags me-2"></i>By Category</h5>
+            </div>
+            <div class="card-body">
+                {% if category_stats %}
+                <ul class="list-group list-group-flush">
+                    {% for stat in category_stats %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span class="badge bg-{{ 'success' if stat.category == 'vip' else 'info' if stat.category == 'speaker' else 'warning' if stat.category == 'leader' else 'secondary' }}">
+                            {{ stat.category | upper }}
+                        </span>
+                        <strong>{{ stat.count }}</strong>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted text-center py-3">No data</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Parishes -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Top Parishes by Registration</h5>
+            </div>
+            <div class="card-body">
+                {% if parish_stats %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Parish</th>
+                                <th>Archdeaconry</th>
+                                <th class="text-center">Total</th>
+                                <th class="text-center">Paid</th>
+                                <th class="text-center">Unpaid</th>
+                                <th class="text-center">Payment Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in parish_stats[:10] %}
+                            <tr>
+                                <td><strong>{{ loop.index }}</strong></td>
+                                <td>{{ stat.parish }}</td>
+                                <td><small class="text-muted">{{ stat.archdeaconry or '-' }}</small></td>
+                                <td class="text-center"><strong>{{ stat.total }}</strong></td>
+                                <td class="text-center text-success">{{ stat.paid }}</td>
+                                <td class="text-center text-danger">{{ stat.total - stat.paid }}</td>
+                                <td class="text-center">
+                                    {% set pct = (stat.paid / stat.total * 100) if stat.total > 0 else 0 %}
+                                    <div class="progress" style="height: 20px; min-width: 80px;">
+                                        <div class="progress-bar bg-{{ 'success' if pct >= 80 else 'warning' if pct >= 50 else 'danger' }}" 
+                                             style="width: {{ pct }}%">
+                                            {{ "%.0f"|format(pct) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-3">No parish data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if unpaid_delegates > 0 and current_user.role != 'viewer' %}
 <div class="alert alert-warning d-flex align-items-center" role="alert">

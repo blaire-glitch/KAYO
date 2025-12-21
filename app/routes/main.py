@@ -40,7 +40,62 @@ def dashboard():
     if current_user.is_admin():
         return redirect(url_for('admin.dashboard'))
     
-    # Users see only their own delegates
+    # DYO (viewer) sees ALL delegates with detailed stats
+    if current_user.role == 'viewer':
+        delegates = Delegate.query.order_by(Delegate.registered_at.desc()).all()
+        
+        # Get all payments
+        payments = Payment.query.filter_by(
+            status='completed'
+        ).order_by(Payment.created_at.desc()).limit(10).all()
+        
+        # Calculate overall stats
+        total_delegates = len(delegates)
+        paid_delegates = sum(1 for d in delegates if d.is_paid)
+        unpaid_delegates = total_delegates - paid_delegates
+        checked_in = sum(1 for d in delegates if d.checked_in)
+        
+        # Get total amount collected
+        total_collected = Payment.get_total_collected()
+        
+        # Get stats by archdeaconry
+        archdeaconry_stats = Delegate.get_stats_by_archdeaconry()
+        
+        # Get stats by parish
+        parish_stats = Delegate.get_stats_by_parish()
+        
+        # Get gender stats
+        gender_stats = Delegate.get_gender_stats()
+        
+        # Get category stats
+        category_stats_raw = Delegate.get_category_stats()
+        category_stats = [{'category': row.category or 'Delegate', 'count': row.count} for row in category_stats_raw]
+        
+        # Get daily registration stats (last 30 days)
+        daily_stats_raw = Delegate.get_daily_registration_stats(30)
+        daily_stats = [{'date': str(row.date), 'count': row.count} for row in daily_stats_raw]
+        
+        # Total registered users (chairs)
+        total_users = User.query.filter(User.role.in_(['chair', 'finance', 'registration_officer', 'data_clerk'])).count()
+        
+        return render_template('dashboard.html',
+            delegates=delegates[:10],  # Show only last 10 in the list
+            total_delegates=total_delegates,
+            paid_delegates=paid_delegates,
+            unpaid_delegates=unpaid_delegates,
+            checked_in=checked_in,
+            total_collected=total_collected,
+            archdeaconry_stats=archdeaconry_stats,
+            parish_stats=parish_stats,
+            gender_stats=gender_stats,
+            category_stats=category_stats,
+            daily_stats=daily_stats,
+            total_users=total_users,
+            payments=payments,
+            is_dyo=True
+        )
+    
+    # Regular users see only their own delegates
     delegates = Delegate.query.filter_by(registered_by=current_user.id).order_by(Delegate.registered_at.desc()).all()
     
     # Get user's payments
@@ -58,5 +113,6 @@ def dashboard():
         total_delegates=total_delegates,
         paid_delegates=paid_delegates,
         unpaid_delegates=unpaid_delegates,
-        payments=payments
+        payments=payments,
+        is_dyo=False
     )
