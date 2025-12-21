@@ -1,12 +1,22 @@
 """Email utility functions for OTP and notifications"""
 from flask import current_app, render_template_string
-from flask_mail import Message
-from app import mail
+
+# Import mail only if available
+try:
+    from app import mail
+except ImportError:
+    mail = None
 
 
 def send_otp_email(user, otp_code):
     """Send OTP verification email to user"""
+    # Check if mail is configured
+    if mail is None or not current_app.config.get('MAIL_USERNAME'):
+        current_app.logger.warning(f"Email not configured. OTP for {user.email}: {otp_code}")
+        return False, "Email service not configured"
+    
     try:
+        from flask_mail import Message
         subject = "KAYO Login Verification Code"
         
         html_body = render_template_string('''
@@ -80,7 +90,12 @@ KAYO - Diocese of Nambale
 
 def send_email(to, subject, body, html_body=None):
     """Generic email sending function"""
+    if mail is None or not current_app.config.get('MAIL_USERNAME'):
+        current_app.logger.warning("Email service not configured")
+        return False, "Email service not configured"
+    
     try:
+        from flask_mail import Message
         msg = Message(
             subject=subject,
             recipients=[to] if isinstance(to, str) else to,
