@@ -275,21 +275,9 @@
     </span>
     <h2>Welcome back, {{ current_user.name }}!</h2>
     <p class="access-level mb-0">
-        {% if current_user.role == 'super_admin' %}
-            Full system access • All permissions granted
-        {% elif current_user.role == 'admin' %}
-            Event administration • System management
-        {% elif current_user.role == 'chair' %}
+        {% if current_user.role == 'chair' %}
             {% if current_user.parish %}Parish: {{ current_user.parish }}{% endif %}
             {% if current_user.local_church %} • {{ current_user.local_church }}{% endif %}
-        {% elif current_user.role == 'finance' %}
-            Financial operations • Payment management
-        {% elif current_user.role == 'registration_officer' %}
-            Delegate registration • Check-in management
-        {% elif current_user.role == 'data_clerk' %}
-            Data entry • Delegate records
-        {% elif current_user.role == 'viewer' %}
-            Read-only access
         {% else %}
             KAYO - ACK Diocese of Nambale
         {% endif %}
