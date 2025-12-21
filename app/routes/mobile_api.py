@@ -592,7 +592,6 @@ def get_delegates(user):
     """
     Get delegates based on user's role and scope:
     - super_admin/admin/finance/data_entry: All delegates
-    - youth_minister: Delegates from their archdeaconry
     - chairperson: Delegates from their parish
     """
     event_id = request.args.get('event_id', type=int)
@@ -629,10 +628,8 @@ def get_delegates(user):
     user_scope = {
         'role': user.role,
         'scope_type': 'all' if user.role in FULL_ACCESS_ROLES else 
-                      'archdeaconry' if user.role in ['youth_minister', 'minister'] else 
                       'parish' if user.role in ['chair', 'chairperson'] else 'own',
-        'scope_value': user.archdeaconry if user.role in ['youth_minister', 'minister'] else 
-                       user.parish if user.role in ['chair', 'chairperson'] else None
+        'scope_value': user.parish if user.role in ['chair', 'chairperson'] else None
     }
     
     return jsonify({
@@ -666,7 +663,7 @@ def get_delegates(user):
 
 
 # Allowed roles for delegate registration
-DELEGATE_REGISTRATION_ROLES = ['youth_minister', 'minister', 'chair', 'chairperson', 'admin', 'super_admin']
+DELEGATE_REGISTRATION_ROLES = ['chair', 'chairperson', 'admin', 'super_admin']
 
 # Allowed roles for payment confirmation
 PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin']
@@ -685,7 +682,6 @@ def can_user_access_delegate(user, delegate, action='view'):
     Permission hierarchy:
     - super_admin/admin: Full access to all delegates
     - finance/treasurer/data_entry/registration: Full access (for their specific functions)
-    - youth_minister/minister: Can access delegates in their archdeaconry only
     - chair/chairperson: Can access delegates in their parish only
     
     Args:
@@ -708,13 +704,6 @@ def can_user_access_delegate(user, delegate, action='view'):
     if user.role in FULL_ACCESS_ROLES:
         return True, None
     
-    # Youth minister can access delegates in their archdeaconry
-    if user.role in ['youth_minister', 'minister']:
-        if user.archdeaconry and delegate.archdeaconry == user.archdeaconry:
-            return True, None
-        else:
-            return False, f'Access denied. You can only {action} delegates from your archdeaconry ({user.archdeaconry or "not set"}).'
-    
     # Chairperson can access delegates in their parish
     if user.role in ['chair', 'chairperson']:
         if user.parish and delegate.parish == user.parish:
@@ -732,20 +721,11 @@ def get_user_delegate_scope_filter(user):
     
     Returns a filter that limits delegates to the user's scope:
     - super_admin/admin/finance/etc: No filter (all delegates)
-    - youth_minister: Filter by archdeaconry
     - chairperson: Filter by parish
     """
     # Full access roles see all delegates
     if user.role in FULL_ACCESS_ROLES or user.role in ['super_admin', 'admin']:
         return None  # No filter needed
-    
-    # Youth minister: filter by archdeaconry
-    if user.role in ['youth_minister', 'minister']:
-        if user.archdeaconry:
-            return Delegate.archdeaconry == user.archdeaconry
-        else:
-            # If archdeaconry not set, only show their own registered delegates
-            return Delegate.registered_by == user.id
     
     # Chairperson: filter by parish
     if user.role in ['chair', 'chairperson']:
@@ -762,7 +742,7 @@ def get_user_delegate_scope_filter(user):
 @mobile_api_bp.route('/delegates', methods=['POST'])
 @token_required
 def register_delegate(user):
-    """Register a new delegate - only youth ministers and chairpersons, or users with approved permission"""
+    """Register a new delegate - only chairpersons, or users with approved permission"""
     try:
         # Check if user has permission to register delegates
         has_role_permission = user.role in DELEGATE_REGISTRATION_ROLES
@@ -1120,7 +1100,6 @@ def get_delegate(user, delegate_id):
 def update_delegate(user, delegate_id):
     """
     Update delegate details - respects role-based scope:
-    - youth_minister: Can only edit delegates in their archdeaconry
     - chairperson: Can only edit delegates in their parish
     - admin/super_admin/finance/data_entry: Can edit all delegates
     """
@@ -1165,7 +1144,6 @@ def update_delegate(user, delegate_id):
 def api_delete_delegate(user, delegate_id):
     """
     Delete a delegate - respects role-based scope:
-    - youth_minister: Can only delete delegates in their archdeaconry
     - chairperson: Can only delete delegates in their parish
     - admin/super_admin: Can delete any delegate
     """
@@ -1594,10 +1572,8 @@ def get_dashboard_stats(user):
     
     # Determine scope type
     scope_type = 'all' if user.role in FULL_ACCESS_ROLES else \
-                 'archdeaconry' if user.role in ['youth_minister', 'minister'] else \
                  'parish' if user.role in ['chair', 'chairperson'] else 'own'
-    scope_name = user.archdeaconry if scope_type == 'archdeaconry' else \
-                 user.parish if scope_type == 'parish' else None
+    scope_name = user.parish if scope_type == 'parish' else None
     
     return jsonify({
         'success': True,
@@ -1674,8 +1650,7 @@ def get_all_archdeaconry_stats(user):
         'archdeaconries': archdeaconry_stats,
         'user_scope': {
             'role': user.role,
-            'can_edit_scope': user.archdeaconry if user.role in ['youth_minister', 'minister'] else 
-                              user.parish if user.role in ['chair', 'chairperson'] else 
+            'can_edit_scope': user.parish if user.role in ['chair', 'chairperson'] else 
                               'all' if user.role in FULL_ACCESS_ROLES else 'own'
         }
     })
@@ -2502,17 +2477,16 @@ def public_registration_status(token):
 @token_required
 def get_pending_registrations(user):
     """
-    Get pending registrations for approval (Chairs, Admins, Youth Ministers).
-    Youth ministers can only view, not approve.
+    Get pending registrations for approval (Chairs, Admins).
     """
-    if user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+    if user.role not in ['chair', 'admin', 'super_admin']:
         return jsonify({'error': 'Access denied'}), 403
     
     pending_list = PendingDelegate.get_pending_for_user(user)
     
     return jsonify({
         'success': True,
-        'can_approve': user.role != 'youth_minister',
+        'can_approve': True,
         'pending_count': len([p for p in pending_list if p.status == 'pending']),
         'registrations': [p.to_dict() for p in pending_list]
     })
@@ -2522,7 +2496,7 @@ def get_pending_registrations(user):
 @token_required
 def get_pending_registration_detail(user, id):
     """Get details of a specific pending registration"""
-    if user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+    if user.role not in ['chair', 'admin', 'super_admin']:
         return jsonify({'error': 'Access denied'}), 403
     
     pending = PendingDelegate.query.get_or_404(id)
@@ -2665,7 +2639,7 @@ def reject_pending_registration(user, id):
 @token_required
 def get_pending_count(user):
     """Get count of pending registrations for the current user"""
-    if user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+    if user.role not in ['chair', 'admin', 'super_admin']:
         return jsonify({'error': 'Access denied'}), 403
     
     pending_list = PendingDelegate.get_pending_for_user(user)
@@ -2754,8 +2728,8 @@ def api_documentation():
                     'returns': 'registration_token for status checking'
                 },
                 'GET /public/registration-status/<token>': 'Check registration status (no auth required)',
-                'GET /pending-registrations': 'Get pending registrations for approval (Chair/Admin/Youth Minister)',
-                'GET /pending-registrations/<id>': 'Get pending registration details (Chair/Admin/Youth Minister)',
+                'GET /pending-registrations': 'Get pending registrations for approval (Chair/Admin)',
+                'GET /pending-registrations/<id>': 'Get pending registration details (Chair/Admin)',
                 'POST /pending-registrations/<id>/approve': {
                     'description': 'Approve registration (Chair/Admin only)',
                     'body': {'notes': 'string (optional)'}
@@ -2764,7 +2738,7 @@ def api_documentation():
                     'description': 'Reject registration (Chair/Admin only)',
                     'body': {'rejection_reason': 'string (required)', 'notes': 'string (optional)'}
                 },
-                'GET /pending-registrations/count': 'Get pending count for current user (Chair/Admin/Youth Minister)'
+                'GET /pending-registrations/count': 'Get pending count for current user (Chair/Admin)'
             },
             'church_data': {
                 'GET /church/archdeaconries': 'Get list of all archdeaconries',

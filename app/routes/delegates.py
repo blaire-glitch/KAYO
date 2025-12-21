@@ -111,7 +111,7 @@ def view_delegate(id):
         flash('You do not have permission to view this delegate.', 'danger')
         return redirect(url_for('delegates.list_delegates'))
     
-    # Pass whether user can edit (youth ministers cannot)
+    # Pass whether user can edit
     can_edit = can_manage_delegate(delegate)
     return render_template('delegates/view.html', delegate=delegate, can_edit=can_edit)
 
@@ -119,11 +119,6 @@ def view_delegate(id):
 @delegates_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_delegate(id):
-    # Youth ministers have view-only access
-    if is_youth_minister():
-        flash('Youth ministers have view-only access and cannot edit delegates.', 'warning')
-        return redirect(url_for('delegates.list_delegates'))
-    
     delegate = Delegate.query.get_or_404(id)
     
     # Check permission using helper function
@@ -167,11 +162,6 @@ def edit_delegate(id):
 @delegates_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_delegate(id):
-    # Youth ministers have view-only access
-    if is_youth_minister():
-        flash('Youth ministers have view-only access and cannot delete delegates.', 'warning')
-        return redirect(url_for('delegates.list_delegates'))
-    
     delegate = Delegate.query.get_or_404(id)
     
     # Check permission using helper function
@@ -225,11 +215,6 @@ def print_badge(id):
 @login_required
 def bulk_register():
     """Bulk registration via CSV upload"""
-    # Youth ministers have view-only access
-    if is_youth_minister():
-        flash('Youth ministers have view-only access and cannot register delegates.', 'warning')
-        return redirect(url_for('delegates.list_delegates'))
-    
     form = BulkRegistrationForm()
     
     if form.validate_on_submit():

@@ -469,13 +469,6 @@ def list_transfers():
     """List fund transfers"""
     if current_user.role in ['admin', 'super_admin', 'finance']:
         transfers = FundTransfer.query.order_by(FundTransfer.created_at.desc()).all()
-    elif current_user.role == 'youth_minister':
-        transfers = FundTransfer.query.filter(
-            db.or_(
-                FundTransfer.from_user_id == current_user.id,
-                FundTransfer.to_user_id == current_user.id
-            )
-        ).order_by(FundTransfer.created_at.desc()).all()
     else:
         transfers = FundTransfer.query.filter_by(from_user_id=current_user.id).order_by(FundTransfer.created_at.desc()).all()
     
@@ -490,23 +483,13 @@ def create_transfer():
     
     # Determine recipient options based on role
     if current_user.role == 'chair':
-        # Chairs can transfer to youth ministers (cash) OR directly to finance (paybill)
-        ym_recipients = User.query.filter_by(role='youth_minister', is_active=True).all()
+        # Chairs transfer directly to finance (via paybill or bank)
         finance_recipients = User.query.filter(
             User.role.in_(['finance', 'admin', 'super_admin']),
             User.is_active == True
         ).all()
-        # Combine both for selection
-        recipients = ym_recipients + finance_recipients
-        transfer_stage = 'chair_to_ym'  # Default, may change based on payment method
-        to_role = 'youth_minister'  # Default
-    elif current_user.role == 'youth_minister':
-        # Youth ministers transfer to finance
-        recipients = User.query.filter(
-            User.role.in_(['finance', 'admin', 'super_admin']),
-            User.is_active == True
-        ).all()
-        transfer_stage = 'ym_to_finance'
+        recipients = finance_recipients
+        transfer_stage = 'chair_to_finance'
         to_role = 'finance'
     else:
         flash('Your role cannot initiate fund transfers.', 'error')
@@ -530,19 +513,9 @@ def create_transfer():
                     # Get the recipient to determine the correct transfer stage
                     recipient = User.query.get(form.to_user_id.data)
                     if recipient:
-                        if current_user.role == 'chair':
-                            if recipient.role in ['finance', 'admin', 'super_admin']:
-                                # Chair paying directly to finance (via paybill or bank)
-                                transfer_stage = 'chair_to_finance'
-                                to_role = 'finance'
-                            else:
-                                # Chair giving cash to youth minister
-                                transfer_stage = 'chair_to_ym'
-                                to_role = 'youth_minister'
-                        else:
-                            # Youth minister to finance
-                            transfer_stage = 'ym_to_finance'
-                            to_role = 'finance'
+                        # Chair paying directly to finance (via paybill or bank)
+                        transfer_stage = 'chair_to_finance'
+                        to_role = 'finance'
                     
                     # Validate M-Pesa reference if payment method is paybill
                     if payment_method == 'mpesa_paybill' and not mpesa_reference:
@@ -710,7 +683,7 @@ def pending_payments():
 
 @bp.route('/payments/<int:payment_id>/confirm', methods=['GET', 'POST'])
 @login_required
-@role_required('finance', 'admin', 'super_admin', 'youth_minister')
+@role_required('finance', 'admin', 'super_admin')
 def confirm_payment(payment_id):
     """Confirm a pledge payment"""
     payment = PledgePayment.query.get_or_404(payment_id)
@@ -759,7 +732,7 @@ def reports():
         total_scheduled = db.session.query(db.func.sum(ScheduledPayment.total_collected)).scalar() or 0
         total_transferred = db.session.query(
             db.func.sum(FundTransfer.amount)
-        ).filter(FundTransfer.status == 'completed', FundTransfer.transfer_stage == 'ym_to_finance').scalar() or 0
+        ).filter(FundTransfer.status == 'completed', FundTransfer.transfer_stage == 'chair_to_finance').scalar() or 0
         
         # By archdeaconry
         by_archdeaconry = db.session.query(

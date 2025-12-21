@@ -15,11 +15,11 @@
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Transfer Options:</strong>
                         {% if is_chair %}
-                        <br><small>• <strong>Cash:</strong> Hand cash to Youth Minister who will forward to Finance</small>
+                        <br><small>• <strong>Cash:</strong> Hand cash directly to Finance</small>
                         <br><small>• <strong>M-Pesa Paybill:</strong> Pay directly to Finance via paybill</small>
                         <br><small>• <strong>Bank Transfer:</strong> Transfer directly to Finance account</small>
                         {% else %}
-                        Youth Minister → Finance
+                        Chair → Finance
                         {% endif %}
                     </div>
 
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
             recipientHelp.innerHTML = '<i class="fas fa-arrow-right text-success me-1"></i>Select a Finance officer to receive the bank transfer';
         } else {
             mpesaGroup.style.display = 'none';
-            recipientHelp.innerHTML = '<i class="fas fa-arrow-right text-primary me-1"></i>Select the Youth Minister to hand cash to';
+            recipientHelp.innerHTML = '<i class="fas fa-arrow-right text-primary me-1"></i>Select a Finance officer to hand cash to';
         }
     }
     

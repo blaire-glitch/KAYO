@@ -202,17 +202,6 @@ class Role(db.Model):
                     'check_in.view'
                 ],
                 'is_system': True
-            },
-            {
-                'name': 'youth_minister',
-                'description': 'Youth Minister - view-only access to delegates and reports',
-                'permissions': [
-                    'delegates.view',
-                    'payments.view',
-                    'check_in.view',
-                    'reports.view'
-                ],
-                'is_system': True
             }
         ]
         

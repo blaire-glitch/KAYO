@@ -4,7 +4,7 @@ A Flask web application for managing youth delegate registrations with M-Pesa pa
 
 ## Features
 
-- 🔐 **Authentication System** - Login for Chairs, Youth Ministers, and Admins
+- 🔐 **Authentication System** - Login for Chairs, Finance, and Admins
 - 👥 **Delegate Registration** - Register delegates with church details
 - 💳 **M-Pesa Integration** - Daraja API for seamless payments via STK Push
 - 📊 **Admin Dashboard** - Overview with statistics, reports, and exports
@@ -148,7 +148,7 @@ For production with PostgreSQL:
 
 ## Usage Guide
 
-### For Chairs/Youth Ministers
+### For Chairs
 
 1. Register an account with your church details
 2. Log in to access your dashboard

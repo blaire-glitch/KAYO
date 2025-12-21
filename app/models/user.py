@@ -7,7 +7,7 @@ from app import db, login_manager
 
 
 class User(UserMixin, db.Model):
-    """Users table for Chairs, Youth Ministers, and Admins"""
+    """Users table for Chairs, Finance, and Admins"""
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)

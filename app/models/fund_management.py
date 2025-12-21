@@ -2,7 +2,7 @@
 Fund Management Models
 - Pledges from delegates, well-wishers
 - Scheduled payments
-- Fund transfers between chairs, youth ministers, and finance
+- Fund transfers between chairs and finance
 """
 from datetime import datetime
 from app import db
@@ -222,7 +222,7 @@ class ScheduledPaymentInstallment(db.Model):
 
 
 class FundTransfer(db.Model):
-    """Fund transfers between chairs, youth ministers, and finance"""
+    """Fund transfers between chairs and finance"""
     __tablename__ = 'fund_transfers'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -239,16 +239,15 @@ class FundTransfer(db.Model):
     
     # Source (who is sending)
     from_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    from_role = db.Column(db.String(50), nullable=False)  # chair, youth_minister
+    from_role = db.Column(db.String(50), nullable=False)  # chair
     
     # Destination (who is receiving)
     to_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    to_role = db.Column(db.String(50), nullable=False)  # youth_minister, finance
+    to_role = db.Column(db.String(50), nullable=False)  # finance
     
     # Transfer stage/flow
-    # chair -> youth_minister -> finance
-    # OR chair -> finance (direct paybill)
-    transfer_stage = db.Column(db.String(50), nullable=False)  # chair_to_ym, ym_to_finance, chair_to_finance
+    # chair -> finance (direct)
+    transfer_stage = db.Column(db.String(50), nullable=False)  # chair_to_finance
     
     # Status
     status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, completed
@@ -370,7 +369,7 @@ class FundTransferApproval(db.Model):
 
 
 class PaymentSummary(db.Model):
-    """Summary of collections by chair/youth minister for reporting"""
+    """Summary of collections by chair for reporting"""
     __tablename__ = 'payment_summaries'
     
     id = db.Column(db.Integer, primary_key=True)
