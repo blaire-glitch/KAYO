@@ -26,15 +26,17 @@ def login():
                 flash('Your account has been deactivated. Please contact admin.', 'danger')
                 return redirect(url_for('auth.login'))
             
-            # Check if user is approved (admins and super_admins are always approved)
+            # Check if user is approved (admins, super_admins, and approved users can login)
             if user.role not in ['admin', 'super_admin']:
+                # Check if user needs approval
                 if user.approval_status == 'pending':
                     flash('Your registration is pending admin approval. Please wait for approval.', 'warning')
                     return redirect(url_for('auth.login'))
                 elif user.approval_status == 'rejected':
                     flash(f'Your registration was rejected. Reason: {user.rejection_reason or "Not specified"}', 'danger')
                     return redirect(url_for('auth.login'))
-                elif not user.is_approved:
+                elif user.approval_status != 'approved' and not user.is_approved:
+                    # If approval_status is not set and is_approved is False, require approval
                     flash('Your account is not approved. Please contact admin.', 'warning')
                     return redirect(url_for('auth.login'))
             
