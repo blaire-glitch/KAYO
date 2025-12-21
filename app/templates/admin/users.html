@@ -57,6 +57,7 @@
                                 </a>
                                 {% if user.id != current_user.id %}
                                 <form action="{{ url_for('admin.toggle_user_active', id=user.id) }}" method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-{{ 'danger' if user.is_active else 'success' }}" title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
                                         <i class="bi bi-{{ 'x-circle' if user.is_active else 'check-circle' }}"></i>
                                     </button>
