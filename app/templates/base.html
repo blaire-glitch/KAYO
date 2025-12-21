@@ -488,7 +488,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><span class="dropdown-item-text text-muted small">{{ current_user.email }}</span></li>
-                            <li><span class="dropdown-item-text"><span class="badge bg-primary">{{ current_user.role|title }}</span></span></li>
+                            <li><span class="dropdown-item-text"><span class="badge bg-primary">{% if current_user.role == 'viewer' %}SUPER DYO{% else %}{{ current_user.role|title }}{% endif %}</span></span></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                         </ul>
