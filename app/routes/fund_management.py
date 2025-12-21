@@ -2,7 +2,7 @@
 Fund Management Routes
 - Pledges tracking
 - Scheduled payments
-- Fund transfers (Chair -> Youth Minister -> Finance)
+- Fund transfers (Chair -> Finance)
 """
 from datetime import datetime, date
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app
@@ -44,8 +44,6 @@ def dashboard():
     """Fund management dashboard based on user role"""
     if current_user.role == 'finance' or current_user.role == 'admin' or current_user.role == 'super_admin':
         return redirect(url_for('fund_management.finance_dashboard'))
-    elif current_user.role == 'youth_minister':
-        return redirect(url_for('fund_management.youth_minister_dashboard'))
     else:
         return redirect(url_for('fund_management.chair_dashboard'))
 
@@ -73,8 +71,8 @@ def chair_dashboard():
     total_transferred = sum(t.amount for t in transfers if t.status == 'completed')
     pending_transfer = total_pledge_collected + total_scheduled - total_transferred
     
-    # Get youth ministers for transfer
-    youth_ministers = User.query.filter_by(role='youth_minister', is_active=True).all()
+    # Get finance users for transfer
+    finance_users = User.query.filter_by(role='finance', is_active=True).all()
     
     return render_template('fund_management/chair_dashboard.html',
                           pledges=pledges,
@@ -85,52 +83,7 @@ def chair_dashboard():
                           total_scheduled=total_scheduled,
                           total_transferred=total_transferred,
                           pending_transfer=pending_transfer,
-                          youth_ministers=youth_ministers,
-                          event=event)
-
-
-@bp.route('/youth-minister/dashboard')
-@login_required
-@role_required('youth_minister', 'admin', 'super_admin')
-def youth_minister_dashboard():
-    """Dashboard for youth ministers to receive and forward funds"""
-    event = current_user.get_current_event()
-    
-    # Get transfers received from chairs (pending and completed)
-    received_transfers = FundTransfer.query.filter_by(
-        to_user_id=current_user.id,
-        transfer_stage='chair_to_ym'
-    ).order_by(FundTransfer.created_at.desc()).all()
-    
-    # Get transfers sent to finance
-    sent_transfers = FundTransfer.query.filter_by(
-        from_user_id=current_user.id,
-        transfer_stage='ym_to_finance'
-    ).order_by(FundTransfer.created_at.desc()).all()
-    
-    # Calculate statistics
-    total_received = sum(t.amount for t in received_transfers if t.status == 'completed')
-    pending_approval = [t for t in received_transfers if t.status == 'pending']
-    total_forwarded = sum(t.amount for t in sent_transfers if t.status == 'completed')
-    funds_on_hand = total_received - total_forwarded
-    
-    # Get finance users for transfer
-    finance_users = User.query.filter(User.role.in_(['finance', 'admin', 'super_admin']), User.is_active == True).all()
-    
-    # Get chairs under this youth minister (by parish/archdeaconry)
-    chairs = User.query.filter_by(role='chair', is_active=True).all()
-    if current_user.parish:
-        chairs = [c for c in chairs if c.parish == current_user.parish]
-    
-    return render_template('fund_management/youth_minister_dashboard.html',
-                          received_transfers=received_transfers,
-                          sent_transfers=sent_transfers,
-                          pending_approval=pending_approval,
-                          total_received=total_received,
-                          total_forwarded=total_forwarded,
-                          funds_on_hand=funds_on_hand,
                           finance_users=finance_users,
-                          chairs=chairs,
                           event=event)
 
 
@@ -143,7 +96,7 @@ def finance_dashboard():
     
     # Get all transfers to finance
     all_transfers = FundTransfer.query.filter_by(
-        transfer_stage='ym_to_finance'
+        transfer_stage='chair_to_finance'
     ).order_by(FundTransfer.created_at.desc()).all()
     
     # Pending transfers that need approval
@@ -161,8 +114,8 @@ def finance_dashboard():
     total_pledged_system = db.session.query(db.func.sum(Pledge.amount_pledged)).scalar() or 0
     total_collected_system = db.session.query(db.func.sum(Pledge.amount_paid)).scalar() or 0
     
-    # Get youth ministers
-    youth_ministers = User.query.filter_by(role='youth_minister', is_active=True).all()
+    # Get all chairs
+    chairs = User.query.filter_by(role='chair', is_active=True).all()
     
     return render_template('fund_management/finance_dashboard.html',
                           all_transfers=all_transfers,
@@ -175,7 +128,7 @@ def finance_dashboard():
                           all_pledges=all_pledges,
                           total_pledged_system=total_pledged_system,
                           total_collected_system=total_collected_system,
-                          youth_ministers=youth_ministers,
+                          chairs=chairs,
                           event=event)
 
 
@@ -256,8 +209,8 @@ def view_pledge(pledge_id):
         from flask import abort
         abort(404)
     
-    # Check access - chairs and youth ministers can view their own pledges
-    allowed_roles = ['admin', 'super_admin', 'finance', 'chair', 'youth_minister']
+    # Check access - chairs can view their own pledges
+    allowed_roles = ['admin', 'super_admin', 'finance', 'chair']
     if current_user.role not in allowed_roles and pledge.recorded_by != current_user.id:
         flash('You do not have permission to view this pledge.', 'error')
         return redirect(url_for('fund_management.list_pledges'))
@@ -275,7 +228,7 @@ def record_pledge_payment(pledge_id):
     pledge = Pledge.query.get_or_404(pledge_id)
     
     # Check access - chairs can record payments for their own pledges
-    allowed_roles = ['admin', 'super_admin', 'finance', 'chair', 'youth_minister']
+    allowed_roles = ['admin', 'super_admin', 'finance', 'chair']
     if current_user.role not in allowed_roles and pledge.recorded_by != current_user.id:
         flash('You do not have permission to record payments for this pledge.', 'error')
         return redirect(url_for('fund_management.list_pledges'))

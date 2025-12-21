@@ -289,8 +289,6 @@
             ⚡ Super Admin
         {% elif current_user.role == 'admin' %}
             🛡️ Administrator
-        {% elif current_user.role == 'youth_minister' %}
-            ✨ Youth Minister
         {% elif current_user.role == 'chair' %}
             🪑 Chair
         {% elif current_user.role == 'finance' %}
@@ -311,10 +309,6 @@
             Full system access • All permissions granted
         {% elif current_user.role == 'admin' %}
             Event administration • System management
-        {% elif current_user.role == 'youth_minister' %}
-            <i class="bi bi-eye me-1"></i>View-Only Access
-            {% if current_user.archdeaconry %} • Archdeaconry: {{ current_user.archdeaconry }}{% endif %}
-            {% if current_user.parish %} • Parish: {{ current_user.parish }}{% endif %}
         {% elif current_user.role == 'chair' %}
             {% if current_user.parish %}Parish: {{ current_user.parish }}{% endif %}
             {% if current_user.local_church %} • {{ current_user.local_church }}{% endif %}

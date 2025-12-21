@@ -101,7 +101,6 @@ class PendingDelegate(db.Model):
         Get pending registrations that a user can approve.
         - Admins see all pending registrations
         - Chairs see registrations from their local church, parish, or archdeaconry
-        - Youth ministers see their archdeaconry (view only)
         """
         from sqlalchemy import func
         
@@ -140,21 +139,6 @@ class PendingDelegate(db.Model):
             
             # If chair has no location set, show all (they need to set their profile)
             if not user.local_church and not user.parish and not user.archdeaconry:
-                return query.order_by(PendingDelegate.submitted_at.desc()).all()
-        
-        elif user.role == 'youth_minister':
-            # Youth ministers see their archdeaconry (view only)
-            if user.archdeaconry:
-                return query.filter(
-                    func.lower(PendingDelegate.archdeaconry) == func.lower(user.archdeaconry)
-                ).order_by(PendingDelegate.submitted_at.desc()).all()
-            # If no archdeaconry set, show all from their parish or all
-            if user.parish:
-                return query.filter(
-                    func.lower(PendingDelegate.parish) == func.lower(user.parish)
-                ).order_by(PendingDelegate.submitted_at.desc()).all()
-            # Fallback: show all if no location set
-            if not user.archdeaconry and not user.parish:
                 return query.order_by(PendingDelegate.submitted_at.desc()).all()
         
         return []

@@ -10,25 +10,15 @@ import io
 delegates_bp = Blueprint('delegates', __name__, url_prefix='/delegates')
 
 
-def is_youth_minister():
-    """Check if current user is a youth minister"""
-    return current_user.role == 'youth_minister'
-
-
 def can_manage_delegate(delegate):
     """
     Check if current user can manage (edit/delete) a delegate.
     - Admins can manage all delegates
-    - Youth ministers have VIEW-ONLY access (cannot edit/delete)
     - Chairs can only manage their own delegates
     """
     # Admins have full access
     if current_user.is_admin():
         return True
-    
-    # Youth ministers have view-only access - cannot manage
-    if is_youth_minister():
-        return False
     
     # Own delegates (for chairs)
     if delegate.registered_by == current_user.id:
@@ -41,7 +31,6 @@ def can_view_delegate(delegate):
     """
     Check if current user can view a delegate.
     - Admins can view all delegates
-    - Youth ministers can view delegates from their archdeaconry
     - Chairs can only view their own delegates
     """
     # Admins have full access
@@ -52,27 +41,12 @@ def can_view_delegate(delegate):
     if delegate.registered_by == current_user.id:
         return True
     
-    # Youth ministers can view delegates from their archdeaconry
-    if is_youth_minister() and current_user.archdeaconry:
-        return delegate.archdeaconry == current_user.archdeaconry
-    
     return False
-
-
-def get_archdeaconry_user_ids(archdeaconry):
-    """Get all user IDs (chairs) in a specific archdeaconry"""
-    users = User.query.filter_by(archdeaconry=archdeaconry).all()
-    return [u.id for u in users]
 
 
 @delegates_bp.route('/register', methods=['GET', 'POST'])
 @login_required
 def register_delegate():
-    # Youth ministers have view-only access
-    if is_youth_minister():
-        flash('Youth ministers have view-only access and cannot register delegates.', 'warning')
-        return redirect(url_for('delegates.list_delegates'))
-    
     form = DelegateForm()
     
     # Pre-fill with user's church details
@@ -117,21 +91,12 @@ def list_delegates():
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
-    # Youth ministers see all delegates from their archdeaconry
-    if is_youth_minister() and current_user.archdeaconry:
-        user_ids = get_archdeaconry_user_ids(current_user.archdeaconry)
-        delegates = Delegate.query.filter(
-            Delegate.registered_by.in_(user_ids)
-        ).order_by(Delegate.registered_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-    else:
-        # Regular users see only their own delegates
-        delegates = Delegate.query.filter_by(
-            registered_by=current_user.id
-        ).order_by(Delegate.registered_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
+    # Users see only their own delegates
+    delegates = Delegate.query.filter_by(
+        registered_by=current_user.id
+    ).order_by(Delegate.registered_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
     
     return render_template('delegates/list.html', delegates=delegates)
 

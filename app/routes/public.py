@@ -140,15 +140,15 @@ def get_parishes(archdeaconry):
 def pending_approvals():
     """View pending registrations for approval (Chairpersons and Admins)"""
     # Check if user can approve (chairs, admins)
-    if current_user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+    if current_user.role not in ['chair', 'admin', 'super_admin']:
         flash('You do not have permission to view pending approvals.', 'danger')
         return redirect(url_for('main.dashboard'))
     
     # Get pending registrations based on user role
     pending_list = PendingDelegate.get_pending_for_user(current_user)
     
-    # Youth ministers can only view, not approve
-    can_approve = current_user.role != 'youth_minister'
+    # All approved users can approve
+    can_approve = True
     
     # Get counts
     pending_count = len([p for p in pending_list if p.status == 'pending'])
@@ -261,7 +261,7 @@ def reject_registration(id):
 @login_required
 def view_pending_registration(id):
     """View details of a pending registration"""
-    if current_user.role not in ['chair', 'admin', 'super_admin', 'youth_minister']:
+    if current_user.role not in ['chair', 'admin', 'super_admin']:
         flash('You do not have permission to view this.', 'danger')
         return redirect(url_for('main.dashboard'))
     
@@ -272,12 +272,8 @@ def view_pending_registration(id):
         if pending.local_church != current_user.local_church:
             flash('You can only view registrations from your local church.', 'danger')
             return redirect(url_for('public.pending_approvals'))
-    elif current_user.role == 'youth_minister':
-        if pending.archdeaconry != current_user.archdeaconry:
-            flash('You can only view registrations from your archdeaconry.', 'danger')
-            return redirect(url_for('public.pending_approvals'))
     
-    can_approve = current_user.role != 'youth_minister'
+    can_approve = True
     
     return render_template('public/view_pending.html', 
                          pending=pending,

@@ -21,13 +21,12 @@ def get_role_choices(include_admin=False, include_all=False):
         choices = [(role.name, role.name.replace('_', ' ').title()) for role in roles]
     elif include_admin:
         # Include admin roles
-        roles = Role.query.filter(Role.name.in_(['chair', 'youth_minister', 'admin', 'data_clerk', 'registration_officer'])).all()
+        roles = Role.query.filter(Role.name.in_(['chair', 'admin', 'data_clerk', 'registration_officer'])).all()
         choices = [(role.name, role.name.replace('_', ' ').title()) for role in roles]
     else:
         # For self-registration - only basic roles
         choices = [
             ('chair', 'Chair'),
-            ('youth_minister', 'Youth Minister'),
         ]
     return choices
 
@@ -44,7 +43,6 @@ class RegistrationForm(FlaskForm):
     phone = StringField('Phone Number', validators=[Optional(), Length(min=10, max=15)])
     role = SelectField('Role', choices=[
         ('chair', 'Chair'),
-        ('youth_minister', 'Youth Minister'),
     ], validators=[DataRequired()])
     local_church = StringField('Local Church', validators=[DataRequired(), Length(max=100)])
     archdeaconry = SelectField('Archdeaconry', validators=[DataRequired()])
