@@ -1,11 +1,33 @@
-from flask import Blueprint, render_template, redirect, url_for, send_from_directory, current_app, abort
+from flask import Blueprint, render_template, redirect, url_for, send_from_directory, current_app, abort, flash, request
 from flask_login import login_required, current_user
 from app.models.delegate import Delegate
 from app.models.payment import Payment
 from app.models.user import User
+from app import db
 import os
 
 main_bp = Blueprint('main', __name__)
+
+
+@main_bp.route('/help')
+@login_required
+def help_page():
+    """In-app help and tutorial page for chairs"""
+    # Mark tutorial as seen when user visits the help page
+    if not current_user.has_seen_tutorial:
+        current_user.has_seen_tutorial = True
+        db.session.commit()
+    return render_template('help/index.html')
+
+
+@main_bp.route('/tutorial/mark-seen', methods=['POST'])
+@login_required
+def mark_tutorial_seen():
+    """Mark tutorial as seen for the current user"""
+    current_user.has_seen_tutorial = True
+    db.session.commit()
+    flash('Welcome! You can access the tutorial anytime from the Help menu.', 'success')
+    return redirect(url_for('main.dashboard'))
 
 
 @main_bp.route('/favicon.ico')

@@ -47,6 +47,9 @@ class User(UserMixin, db.Model):
     # Multi-event support
     current_event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=True)
     
+    # Tutorial tracking
+    has_seen_tutorial = db.Column(db.Boolean, default=False)
+    
     # Relationships
     delegates = db.relationship('Delegate', backref='registered_by_user', lazy='dynamic',
                                foreign_keys='Delegate.registered_by')

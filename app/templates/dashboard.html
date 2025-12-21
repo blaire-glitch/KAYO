@@ -717,4 +717,76 @@
         </div>
     </div>
 </div>
+
+<!-- First Login Tutorial Modal for Chairs -->
+{% if current_user.role in ['chair', 'finance', 'registration_officer', 'data_clerk'] and not current_user.has_seen_tutorial %}
+<div class="modal fade" id="welcomeTutorialModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h4 class="modal-title">
+                    <i class="bi bi-stars me-2"></i>Welcome to KAYO!
+                </h4>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                        <i class="bi bi-person-check text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <h3 class="fw-bold">Hello, {{ current_user.name.split()[0] }}!</h3>
+                    <p class="text-muted lead">Your account has been approved. Let's get you started!</p>
+                </div>
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4 text-center">
+                        <div class="p-3 bg-light rounded-3">
+                            <i class="bi bi-person-plus text-success fs-2 mb-2"></i>
+                            <h6>Register Delegates</h6>
+                            <small class="text-muted">Add your parish youth members</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="p-3 bg-light rounded-3">
+                            <i class="bi bi-wallet2 text-warning fs-2 mb-2"></i>
+                            <h6>Process Payments</h6>
+                            <small class="text-muted">Record M-Pesa transactions</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="p-3 bg-light rounded-3">
+                            <i class="bi bi-person-vcard text-info fs-2 mb-2"></i>
+                            <h6>Print Badges</h6>
+                            <small class="text-muted">Generate event badges</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-lightbulb me-2"></i>
+                    <strong>Pro Tip:</strong> Check out the <strong>Help & Tutorial</strong> section in the sidebar anytime you need guidance!
+                </div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center gap-2">
+                <a href="{{ url_for('main.help_page') }}" class="btn btn-primary btn-lg px-4">
+                    <i class="bi bi-book me-2"></i>View Full Tutorial
+                </a>
+                <form action="{{ url_for('main.mark_tutorial_seen') }}" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-secondary btn-lg px-4">
+                        Skip for Now
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Show modal on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        var welcomeModal = new bootstrap.Modal(document.getElementById('welcomeTutorialModal'));
+        welcomeModal.show();
+    });
+</script>
+{% endif %}
 {% endblock %}
