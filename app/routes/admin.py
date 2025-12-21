@@ -243,7 +243,11 @@ def create_user():
             role=form.role.data,
             local_church=form.local_church.data or None,
             parish=form.parish.data or None,
-            archdeaconry=form.archdeaconry.data or None
+            archdeaconry=form.archdeaconry.data or None,
+            is_approved=True,
+            approval_status='approved',
+            approved_by=current_user.id,
+            approved_at=datetime.utcnow()
         )
         user.set_password(form.password.data)
         db.session.add(user)
