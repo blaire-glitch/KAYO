@@ -93,7 +93,12 @@ class DelegateForm(FlaskForm):
     ], validators=[DataRequired()])
     category = SelectField('Category', choices=[
         ('delegate', 'Delegate'),
-        ('leader', 'Leader'),
+        ('counsellor', 'Counsellor'),
+        ('youth_minister', 'Youth Minister'),
+        ('nav', 'NAV (Worship Team)'),
+        ('intercessor', 'Intercessor'),
+        ('clergy', 'Clergy'),
+        ('arise_band', 'Arise Band_Ke'),
         ('speaker', 'Speaker'),
         ('vip', 'VIP')
     ], validators=[DataRequired()])
@@ -180,7 +185,12 @@ class SearchForm(FlaskForm):
     category = SelectField('Category', choices=[
         ('', 'All Categories'),
         ('delegate', 'Delegate'),
-        ('leader', 'Leader'),
+        ('counsellor', 'Counsellor'),
+        ('youth_minister', 'Youth Minister'),
+        ('nav', 'NAV (Worship Team)'),
+        ('intercessor', 'Intercessor'),
+        ('clergy', 'Clergy'),
+        ('arise_band', 'Arise Band_Ke'),
         ('speaker', 'Speaker'),
         ('vip', 'VIP')
     ], validators=[Optional()])
