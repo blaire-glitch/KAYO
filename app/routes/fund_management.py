@@ -314,6 +314,40 @@ def cancel_pledge(pledge_id):
     return redirect(url_for('fund_management.list_pledges'))
 
 
+@bp.route('/pledges/<int:pledge_id>/delete', methods=['POST'])
+@login_required
+def delete_pledge(pledge_id):
+    """Delete a pledge permanently"""
+    pledge = Pledge.query.get_or_404(pledge_id)
+    
+    # Only admins can delete, or chairs can delete their own pledges with no payments
+    if current_user.role in ['admin', 'super_admin']:
+        # Admins can delete any pledge
+        pass
+    elif pledge.recorded_by == current_user.id and pledge.amount_paid == 0:
+        # Chairs can delete their own pledges with no payments
+        pass
+    else:
+        flash('You do not have permission to delete this pledge.', 'error')
+        return redirect(url_for('fund_management.list_pledges'))
+    
+    # If pledge has payments, delete them first (only if admin)
+    if pledge.amount_paid > 0 and current_user.role not in ['admin', 'super_admin']:
+        flash('Cannot delete a pledge with payments. Contact admin.', 'error')
+        return redirect(url_for('fund_management.view_pledge', pledge_id=pledge.id))
+    
+    # Delete associated payments first
+    PledgePayment.query.filter_by(pledge_id=pledge.id).delete()
+    
+    # Delete the pledge
+    pledge_name = pledge.source_name
+    db.session.delete(pledge)
+    db.session.commit()
+    
+    flash(f'Pledge from "{pledge_name}" has been deleted.', 'success')
+    return redirect(url_for('fund_management.list_pledges'))
+
+
 # ============== SCHEDULED PAYMENTS ==============
 
 @bp.route('/scheduled')
