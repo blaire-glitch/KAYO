@@ -657,7 +657,7 @@
                         {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'delegates.list_delegates' %}active{% endif %}" href="{{ url_for('delegates.list_delegates') }}">
-                                <i class="bi bi-list-ul"></i>My Delegates
+                                <i class="bi bi-list-ul"></i>{% if current_user.role == 'viewer' %}Delegates{% else %}My Delegates{% endif %}
                             </a>
                         </li>
                         {% if current_user.role in ['chair', 'admin', 'super_admin'] %}
