@@ -254,25 +254,6 @@
 <!-- Role-Based Welcome Card -->
 {% set role_class = current_user.role | replace('_', '-') %}
 <div class="welcome-card {{ role_class }}">
-    <span class="role-badge">
-        {% if current_user.role == 'super_admin' %}
-            ⚡ Super Admin
-        {% elif current_user.role == 'admin' %}
-            🛡️ Administrator
-        {% elif current_user.role == 'chair' %}
-            🪑 Chair
-        {% elif current_user.role == 'finance' %}
-            💰 Finance
-        {% elif current_user.role == 'registration_officer' %}
-            📋 Registration Officer
-        {% elif current_user.role == 'data_clerk' %}
-            📊 Data Clerk
-        {% elif current_user.role == 'viewer' %}
-            👁️ Viewer
-        {% else %}
-            👤 Member
-        {% endif %}
-    </span>
     <h2>Welcome back, {{ current_user.name }}!</h2>
     <p class="access-level mb-0">
         {% if current_user.role == 'chair' %}
