@@ -121,7 +121,9 @@
         <div class="text-center py-5">
             <i class="bi bi-person-plus text-muted" style="font-size: 3rem;"></i>
             <p class="mt-3 text-muted">No delegates registered yet.</p>
+            {% if current_user.role != 'viewer' %}
             <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">Register First Delegate</a>
+            {% endif %}
         </div>
         {% endif %}
     </div>
