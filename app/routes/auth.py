@@ -26,8 +26,9 @@ def login():
                 flash('Your account has been deactivated. Please contact admin.', 'danger')
                 return redirect(url_for('auth.login'))
             
-            # Check if user is approved (admins, super_admins, and approved users can login)
-            if user.role not in ['admin', 'super_admin']:
+            # Check if user is approved (admins, super_admins, finance, viewer roles skip approval check)
+            # Finance and viewer can only be created by admins, so they're inherently trusted
+            if user.role not in ['admin', 'super_admin', 'finance', 'viewer']:
                 # Check if user needs approval
                 if user.approval_status == 'pending':
                     flash('Your registration is pending admin approval. Please wait for approval.', 'warning')
