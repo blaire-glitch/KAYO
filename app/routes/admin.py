@@ -615,3 +615,63 @@ def api_stats():
         'paid_delegates': Delegate.query.filter_by(is_paid=True).count(),
         'checked_in': Delegate.query.filter_by(checked_in=True).count()
     })
+
+
+@admin_bp.route('/pending-approvals')
+@login_required
+@admin_required
+def pending_approvals():
+    """View pending user registration approvals"""
+    pending_users = User.get_pending_registrations()
+    return render_template('admin/pending_approvals.html', pending_users=pending_users)
+
+
+@admin_bp.route('/approve-user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def approve_user(user_id):
+    """Approve a pending user registration"""
+    user = User.query.get_or_404(user_id)
+    
+    if user.approval_status != 'pending':
+        flash('This registration has already been processed.', 'warning')
+        return redirect(url_for('admin.pending_approvals'))
+    
+    # Check again if parish already has a chair
+    if user.role == 'chair' and User.parish_has_chair(user.parish):
+        existing_chair = User.get_parish_chair(user.parish)
+        flash(f'Cannot approve. Parish "{user.parish}" already has an approved chair ({existing_chair.name}).', 'danger')
+        return redirect(url_for('admin.pending_approvals'))
+    
+    user.is_approved = True
+    user.approval_status = 'approved'
+    user.approved_by = current_user.id
+    user.approved_at = datetime.utcnow()
+    db.session.commit()
+    
+    flash(f'User {user.name} has been approved as chair for {user.parish}.', 'success')
+    return redirect(url_for('admin.pending_approvals'))
+
+
+@admin_bp.route('/reject-user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def reject_user(user_id):
+    """Reject a pending user registration"""
+    user = User.query.get_or_404(user_id)
+    
+    if user.approval_status != 'pending':
+        flash('This registration has already been processed.', 'warning')
+        return redirect(url_for('admin.pending_approvals'))
+    
+    reason = request.form.get('reason', 'Not specified')
+    
+    user.is_approved = False
+    user.approval_status = 'rejected'
+    user.rejection_reason = reason
+    user.approved_by = current_user.id
+    user.approved_at = datetime.utcnow()
+    db.session.commit()
+    
+    flash(f'User {user.name} registration has been rejected.', 'info')
+    return redirect(url_for('admin.pending_approvals'))

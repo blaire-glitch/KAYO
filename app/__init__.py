@@ -89,6 +89,15 @@ def create_app(config_class=Config):
         from flask_wtf.csrf import generate_csrf
         return dict(csrf_token=generate_csrf)
     
+    # Inject pending registration count for admin navigation
+    @app.context_processor
+    def inject_pending_count():
+        if current_user.is_authenticated and current_user.is_admin():
+            from app.models.user import User
+            pending_count = User.query.filter_by(approval_status='pending', role='chair').count()
+            return dict(pending_registration_count=pending_count)
+        return dict(pending_registration_count=0)
+    
     # Custom unauthorized handler for session invalidation
     @login_manager.unauthorized_handler
     def unauthorized():

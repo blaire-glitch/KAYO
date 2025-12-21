@@ -25,6 +25,13 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     
+    # Admin approval fields
+    is_approved = db.Column(db.Boolean, default=False)  # Requires admin approval
+    approval_status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    rejection_reason = db.Column(db.String(500), nullable=True)
+    
     # Session management - for single session restriction
     session_token = db.Column(db.String(64), nullable=True)
     
@@ -81,6 +88,29 @@ class User(UserMixin, db.Model):
         """Clear OTP after successful verification"""
         self.otp_code = None
         self.otp_expires_at = None
+    
+    @classmethod
+    def get_parish_chair(cls, parish):
+        """Get the approved chair for a parish, if any"""
+        return cls.query.filter_by(
+            parish=parish,
+            role='chair',
+            is_approved=True,
+            is_active=True
+        ).first()
+    
+    @classmethod
+    def parish_has_chair(cls, parish):
+        """Check if a parish already has an approved chair"""
+        return cls.get_parish_chair(parish) is not None
+    
+    @classmethod
+    def get_pending_registrations(cls):
+        """Get all pending registration requests"""
+        return cls.query.filter_by(
+            approval_status='pending',
+            role='chair'
+        ).order_by(cls.created_at.desc()).all()
     
     def is_admin(self):
         return self.role == 'admin' or self.role == 'super_admin'

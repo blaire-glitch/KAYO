@@ -26,6 +26,18 @@ def login():
                 flash('Your account has been deactivated. Please contact admin.', 'danger')
                 return redirect(url_for('auth.login'))
             
+            # Check if user is approved (admins and super_admins are always approved)
+            if user.role not in ['admin', 'super_admin']:
+                if user.approval_status == 'pending':
+                    flash('Your registration is pending admin approval. Please wait for approval.', 'warning')
+                    return redirect(url_for('auth.login'))
+                elif user.approval_status == 'rejected':
+                    flash(f'Your registration was rejected. Reason: {user.rejection_reason or "Not specified"}', 'danger')
+                    return redirect(url_for('auth.login'))
+                elif not user.is_approved:
+                    flash('Your account is not approved. Please contact admin.', 'warning')
+                    return redirect(url_for('auth.login'))
+            
             # Check if OTP is required for this user (chairs only)
             otp_required = current_app.config.get('OTP_REQUIRED_FOR_CHAIRS', True)
             if otp_required and user.role == 'chair':
@@ -143,6 +155,23 @@ def register():
             flash('Email already registered. Please login or use a different email.', 'danger')
             return render_template('auth/register.html', form=form)
         
+        # Check if parish already has an approved chair
+        if form.role.data == 'chair':
+            existing_chair = User.get_parish_chair(form.parish.data)
+            if existing_chair:
+                flash(f'Parish "{form.parish.data}" already has an approved chair ({existing_chair.name}). Only one chair per parish is allowed.', 'danger')
+                return render_template('auth/register.html', form=form)
+            
+            # Check if there's a pending request for this parish
+            pending_chair = User.query.filter_by(
+                parish=form.parish.data,
+                role='chair',
+                approval_status='pending'
+            ).first()
+            if pending_chair:
+                flash(f'There is already a pending registration for parish "{form.parish.data}". Please wait for admin review.', 'warning')
+                return render_template('auth/register.html', form=form)
+        
         user = User(
             name=form.name.data,
             email=form.email.data,
@@ -151,12 +180,15 @@ def register():
             local_church=form.local_church.data,
             parish=form.parish.data,
             archdeaconry=form.archdeaconry.data,
-            oauth_provider='local'
+            oauth_provider='local',
+            is_approved=False,
+            approval_status='pending'
         )
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
-        flash('Registration successful! You can now login.', 'success')
+        
+        flash('Registration submitted successfully! Your account is pending admin approval. You will receive an email once approved.', 'success')
         return redirect(url_for('auth.login'))
     
     return render_template('auth/register.html', form=form)

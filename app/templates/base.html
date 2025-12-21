@@ -531,6 +531,15 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if 'admin.pending_approvals' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.pending_approvals') }}">
+                                <i class="bi bi-person-check"></i>Approvals
+                                {% set pending_count = pending_registration_count|default(0) %}
+                                {% if pending_count > 0 %}
+                                <span class="badge bg-danger ms-1">{{ pending_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if 'admin.all_delegates' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.all_delegates') }}">
                                 <i class="bi bi-people"></i>All Delegates
                             </a>
