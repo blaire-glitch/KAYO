@@ -6,13 +6,25 @@ import sqlite3
 import os
 
 def add_tutorial_column():
-    # Get database path
-    db_path = os.path.join(os.path.dirname(__file__), 'instance', 'kayo.db')
+    # Try multiple possible database paths
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), 'instance', 'kayo.db'),
+        os.path.join(os.path.dirname(__file__), 'instance', 'app.db'),
+        '/home/monsiuer/KAYO/instance/kayo.db',  # PythonAnywhere path
+        '/home/monsiuer/KAYO/instance/app.db',
+    ]
     
-    if not os.path.exists(db_path):
-        print(f"Database not found at {db_path}")
+    db_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            db_path = path
+            break
+    
+    if not db_path:
+        print(f"Database not found. Tried: {possible_paths}")
         return False
     
+    print(f"Using database: {db_path}")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
