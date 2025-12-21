@@ -343,9 +343,11 @@
     <div>
         <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
     </div>
+    {% if current_user.role != 'viewer' %}
     <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
         <i class="bi bi-person-plus me-2"></i>Register Delegate
     </a>
+    {% endif %}
 </div>
 
 <!-- Stats Cards -->
@@ -393,7 +395,7 @@
     </div>
 </div>
 
-{% if unpaid_delegates > 0 %}
+{% if unpaid_delegates > 0 and current_user.role != 'viewer' %}
 <div class="alert alert-warning d-flex align-items-center" role="alert">
     <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 1.5rem;"></i>
     <div>
