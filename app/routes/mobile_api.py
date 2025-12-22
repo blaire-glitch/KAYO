@@ -830,21 +830,36 @@ def register_delegate(user):
             registered_by=user.id
         )
         
+        # Auto-mark fee-exempt categories as paid with ticket
+        if delegate.is_fee_exempt():
+            delegate.is_paid = True
+            delegate.amount_paid = 0
+            delegate.payment_confirmed_by = user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
+            delegate.ticket_number = Delegate.generate_ticket_number(event)
+        
         db.session.add(delegate)
         db.session.commit()
         
-        return jsonify({
+        response_data = {
             'success': True,
-            'message': 'Delegate registered successfully. Ticket will be issued after payment verification.',
             'delegate': {
                 'id': delegate.id,
                 'delegate_number': delegate.delegate_number,
-                'ticket_number': None,
-                'ticket_status': 'Pending payment verification',
+                'ticket_number': delegate.ticket_number,
                 'name': delegate.name,
                 'is_paid': delegate.is_paid
             }
-        }), 201
+        }
+        
+        if delegate.is_fee_exempt():
+            response_data['message'] = 'Delegate registered successfully. Fee-exempt category - no payment required.'
+            response_data['delegate']['ticket_status'] = 'Issued (Fee-exempt)'
+        else:
+            response_data['message'] = 'Delegate registered successfully. Ticket will be issued after payment verification.'
+            response_data['delegate']['ticket_status'] = 'Pending payment verification'
+        
+        return jsonify(response_data), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500

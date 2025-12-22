@@ -50,13 +50,13 @@
                             {% for delegate in unpaid_delegates %}
                             <tr class="delegate-row" data-search="{{ delegate.name|lower }} {{ delegate.local_church|lower }} {{ delegate.parish|lower }} {{ delegate.archdeaconry|lower }}">
                                 <td>
-                                    <input type="checkbox" class="form-check-input delegate-checkbox" value="{{ delegate.id }}" data-fee="{{ delegate_fee }}">
+                                    <input type="checkbox" class="form-check-input delegate-checkbox" value="{{ delegate.id }}" data-fee="{{ delegate.get_registration_fee() }}">
                                 </td>
                                 <td>{{ delegate.name }}</td>
                                 <td>{{ delegate.local_church }}</td>
                                 <td>{{ delegate.parish }}</td>
                                 <td>{{ delegate.archdeaconry }}</td>
-                                <td>KSh {{ delegate_fee | int }}</td>
+                                <td>KSh {{ delegate.get_registration_fee() | int }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

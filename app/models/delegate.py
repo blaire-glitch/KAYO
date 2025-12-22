@@ -17,6 +17,9 @@ class Delegate(db.Model):
     """Delegates table - people being registered for the event"""
     __tablename__ = 'delegates'
     
+    # Categories exempt from registration fees
+    FEE_EXEMPT_CATEGORIES = ['nav', 'arise_band']
+    
     id = db.Column(db.Integer, primary_key=True)
     ticket_number = db.Column(db.String(20), unique=True, nullable=False)
     delegate_number = db.Column(db.Integer, nullable=True)  # Auto-assigned sequential number
@@ -58,6 +61,23 @@ class Delegate(db.Model):
     
     def __repr__(self):
         return f'<Delegate {self.name}>'
+    
+    def is_fee_exempt(self):
+        """Check if this delegate is exempt from registration fees"""
+        return self.category in self.FEE_EXEMPT_CATEGORIES
+    
+    def get_registration_fee(self):
+        """Get the registration fee for this delegate based on category"""
+        if self.is_fee_exempt():
+            return 0
+        
+        # Check if delegate has a pricing tier
+        if self.pricing_tier:
+            return self.pricing_tier.price
+        
+        # Fall back to default fee from config
+        from flask import current_app
+        return current_app.config.get('DELEGATE_FEE', 1000)
     
     def get_custom_field_values(self):
         """Parse custom field values JSON"""

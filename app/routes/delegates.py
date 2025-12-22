@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, Response
 from flask_login import login_required, current_user
+from datetime import datetime
 from app import db
 from app.models.delegate import Delegate
 from app.models.user import User
@@ -77,9 +78,21 @@ def register_delegate():
             category=form.category.data,
             registered_by=current_user.id
         )
+        
+        # Auto-mark fee-exempt categories as paid
+        if delegate.is_fee_exempt():
+            delegate.is_paid = True
+            delegate.amount_paid = 0
+            delegate.payment_confirmed_by = current_user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
+        
         db.session.add(delegate)
         db.session.commit()
-        flash(f'Delegate "{delegate.name}" registered successfully! Ticket: {delegate.ticket_number}', 'success')
+        
+        success_msg = f'Delegate "{delegate.name}" registered successfully! Ticket: {delegate.ticket_number}'
+        if delegate.is_fee_exempt():
+            success_msg += ' (Fee-exempt: No payment required)'
+        flash(success_msg, 'success')
         return redirect(url_for('delegates.view_delegate', id=delegate.id))
     
     return render_template('delegates/register.html', form=form)

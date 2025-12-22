@@ -27,6 +27,7 @@
                             <tr>
                                 <th>#</th>
                                 <th>Name</th>
+                                <th>Category</th>
                                 <th>Parish</th>
                                 <th>Fee</th>
                             </tr>
@@ -36,14 +37,23 @@
                             <tr>
                                 <td>{{ loop.index }}</td>
                                 <td>{{ delegate.name }}</td>
+                                <td>
+                                    {% if delegate.category == 'nav' %}
+                                    <span class="badge bg-info">Worship Team</span>
+                                    {% elif delegate.category == 'arise_band' %}
+                                    <span class="badge bg-info">Arise Band</span>
+                                    {% else %}
+                                    {{ delegate.category|replace('_', ' ')|title }}
+                                    {% endif %}
+                                </td>
                                 <td>{{ delegate.parish }}</td>
-                                <td>KSh {{ delegate_fee | int }}</td>
+                                <td>KSh {{ delegate.get_registration_fee()|int }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot>
                             <tr class="table-primary">
-                                <td colspan="3" class="text-end fw-bold">Total Amount:</td>
+                                <td colspan="4" class="text-end fw-bold">Total Amount:</td>
                                 <td class="fw-bold">KSh {{ total_amount | int }}</td>
                             </tr>
                         </tfoot>

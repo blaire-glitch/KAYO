@@ -18,19 +18,26 @@ PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin', 'r
 @login_required
 def payment_page():
     """Show payment page with unpaid delegates"""
-    # Get unpaid delegates
-    unpaid_delegates = Delegate.query.filter_by(
+    # Get unpaid delegates that require payment (exclude fee-exempt categories)
+    all_unpaid = Delegate.query.filter_by(
         registered_by=current_user.id,
         is_paid=False
     ).all()
     
+    # Separate fee-exempt and fee-required delegates
+    unpaid_delegates = [d for d in all_unpaid if not d.is_fee_exempt()]
+    fee_exempt_delegates = [d for d in all_unpaid if d.is_fee_exempt()]
+    
     if not unpaid_delegates:
-        flash('No unpaid delegates to process.', 'info')
+        if fee_exempt_delegates:
+            flash(f'{len(fee_exempt_delegates)} delegate(s) are fee-exempt (Worship Team/Arise Band) and do not require payment.', 'info')
+        else:
+            flash('No unpaid delegates to process.', 'info')
         return redirect(url_for('main.dashboard'))
     
-    # Calculate total
+    # Calculate total based on each delegate's fee
+    total_amount = sum(d.get_registration_fee() for d in unpaid_delegates)
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
-    total_amount = len(unpaid_delegates) * delegate_fee
     
     form = PaymentForm()
     if current_user.phone:
@@ -71,19 +78,21 @@ def initiate_payment():
     payment_method = form.payment_method.data
     current_app.logger.info(f'Payment method selected: {payment_method}')
     
-    # Get unpaid delegates
-    unpaid_delegates = Delegate.query.filter_by(
+    # Get unpaid delegates that require payment (exclude fee-exempt)
+    all_unpaid = Delegate.query.filter_by(
         registered_by=current_user.id,
         is_paid=False
     ).all()
+    
+    unpaid_delegates = [d for d in all_unpaid if not d.is_fee_exempt()]
     
     if not unpaid_delegates:
         flash('No unpaid delegates to process.', 'info')
         return redirect(url_for('main.dashboard'))
     
-    # Calculate total
+    # Calculate total based on each delegate's fee
+    total_amount = sum(d.get_registration_fee() for d in unpaid_delegates)
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
-    total_amount = len(unpaid_delegates) * delegate_fee
     
     if payment_method == 'mpesa':
         # M-Pesa STK Push
@@ -177,6 +186,9 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
         # Use direct UPDATE query to ensure changes are persisted
         tickets_issued = 0
         for delegate in unpaid_delegates:
+            # Get the correct fee for this delegate
+            delegate_specific_fee = delegate.get_registration_fee()
+            
             # Generate ticket number if not already assigned
             new_ticket = None
             if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
@@ -188,7 +200,7 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
             update_data = {
                 'payment_id': payment_id,
                 'is_paid': True,
-                'amount_paid': delegate_fee,
+                'amount_paid': delegate_specific_fee,
                 'payment_confirmed_by': current_user.id,
                 'payment_confirmed_at': now
             }
@@ -243,6 +255,9 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
         # Use direct UPDATE query to ensure changes are persisted
         tickets_issued = 0
         for delegate in unpaid_delegates:
+            # Get the correct fee for this delegate
+            delegate_specific_fee = delegate.get_registration_fee()
+            
             # Generate ticket number if not already assigned
             new_ticket = None
             if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
@@ -254,7 +269,7 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
             update_data = {
                 'payment_id': payment_id,
                 'is_paid': True,
-                'amount_paid': delegate_fee,
+                'amount_paid': delegate_specific_fee,
                 'payment_confirmed_by': current_user.id,
                 'payment_confirmed_at': now
             }
@@ -292,10 +307,11 @@ def confirm_cash_payment():
     form = CashPaymentForm()
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     
-    # Get all unpaid delegates
-    unpaid_delegates = Delegate.query.filter_by(is_paid=False).order_by(
+    # Get all unpaid delegates (excluding fee-exempt)
+    all_unpaid = Delegate.query.filter_by(is_paid=False).order_by(
         Delegate.archdeaconry, Delegate.parish, Delegate.name
     ).all()
+    unpaid_delegates = [d for d in all_unpaid if not d.is_fee_exempt()]
     
     if request.method == 'POST' and form.validate_on_submit():
         try:
@@ -315,8 +331,8 @@ def confirm_cash_payment():
                 flash('No delegates found with the provided IDs.', 'danger')
                 return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
             
-            # Calculate amount
-            total_amount = len(delegates) * delegate_fee
+            # Calculate amount using each delegate's fee
+            total_amount = sum(d.get_registration_fee() for d in delegates)
             
             # Create payment record
             payment = Payment(
@@ -338,6 +354,9 @@ def confirm_cash_payment():
             # Use direct UPDATE query to ensure changes are persisted
             tickets_issued = 0
             for delegate in delegates:
+                # Get the correct fee for this delegate
+                delegate_specific_fee = delegate.get_registration_fee()
+                
                 # Generate ticket number if not already assigned
                 new_ticket = None
                 if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
@@ -349,7 +368,7 @@ def confirm_cash_payment():
                 update_data = {
                     'payment_id': payment_id,
                     'is_paid': True,
-                    'amount_paid': delegate_fee,
+                    'amount_paid': delegate_specific_fee,
                     'payment_confirmed_by': current_user.id,
                     'payment_confirmed_at': now
                 }
