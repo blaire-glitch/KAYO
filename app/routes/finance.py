@@ -878,6 +878,31 @@ def export_journals():
     )
 
 
+@finance_bp.route('/export/accounts')
+@login_required
+@require_finance_role
+def export_accounts():
+    """Export chart of accounts to CSV"""
+    accounts = Account.query.filter_by(is_active=True).order_by(Account.code).all()
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Code', 'Account Name', 'Type', 'Normal Balance', 'Current Balance', 'Description'])
+    
+    for account in accounts:
+        writer.writerow([
+            account.code, account.name, account.account_type,
+            account.normal_balance, account.current_balance, account.description or ''
+        ])
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=chart_of_accounts_{date.today()}.csv'}
+    )
+
+
 # ==================== INITIALIZE DEFAULT ACCOUNTS ====================
 
 @finance_bp.route('/setup/initialize', methods=['POST'])
