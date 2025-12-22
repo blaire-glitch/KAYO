@@ -114,7 +114,14 @@
 
 {% block extra_js %}
 <script>
-const accounts = {{ accounts|tojson|safe }};
+// Initialize accounts data - ensure it's valid even if empty
+let accounts = [];
+try {
+    accounts = {{ accounts|tojson|safe }};
+} catch(e) {
+    console.error('Error parsing accounts:', e);
+}
+
 let lineCount = 0;
 
 function addLine(debit = '', credit = '') {
