@@ -548,3 +548,254 @@ def delete_payment(payment_id):
     
     flash('Payment record deleted.', 'success')
     return redirect(url_for('payments.payment_history'))
+
+
+# ==================== FINANCE PAYMENT MANAGEMENT ====================
+
+@payments_bp.route('/finance/dashboard')
+@login_required
+def finance_payment_dashboard():
+    """Finance dashboard for payment verification, approval, and receipt"""
+    if current_user.role not in ['finance', 'admin', 'super_admin']:
+        flash('Access denied. Finance personnel only.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    # Get all payments grouped by status
+    pending_payments = Payment.query.filter_by(status='pending').order_by(Payment.created_at.desc()).all()
+    completed_payments = Payment.query.filter_by(status='completed').order_by(Payment.completed_at.desc()).limit(50).all()
+    failed_payments = Payment.query.filter_by(status='failed').order_by(Payment.created_at.desc()).limit(20).all()
+    
+    # Stats
+    total_pending = sum(p.amount for p in pending_payments)
+    total_completed = db.session.query(db.func.sum(Payment.amount)).filter_by(status='completed').scalar() or 0
+    total_today = db.session.query(db.func.sum(Payment.amount)).filter(
+        Payment.status == 'completed',
+        Payment.completed_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
+    ).scalar() or 0
+    
+    # Count delegates paid vs unpaid
+    total_delegates = Delegate.query.count()
+    paid_delegates = Delegate.query.filter_by(is_paid=True).count()
+    
+    return render_template('payments/finance_dashboard.html',
+        pending_payments=pending_payments,
+        completed_payments=completed_payments,
+        failed_payments=failed_payments,
+        total_pending=total_pending,
+        total_completed=total_completed,
+        total_today=total_today,
+        total_delegates=total_delegates,
+        paid_delegates=paid_delegates
+    )
+
+
+@payments_bp.route('/finance/verify/<int:payment_id>', methods=['GET', 'POST'])
+@login_required
+def verify_payment(payment_id):
+    """Verify a pending payment"""
+    if current_user.role not in ['finance', 'admin', 'super_admin']:
+        flash('Access denied. Finance personnel only.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    payment = Payment.query.get_or_404(payment_id)
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        notes = request.form.get('notes', '')
+        
+        if action == 'approve':
+            payment.status = 'completed'
+            payment.completed_at = datetime.utcnow()
+            payment.result_desc = f"Verified by {current_user.name}. {notes}"
+            
+            # Update delegates linked to this payment
+            delegates = Delegate.query.filter_by(payment_id=payment.id).all()
+            for delegate in delegates:
+                delegate.is_paid = True
+                delegate.paid_at = datetime.utcnow()
+                if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                    event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                    delegate.ticket_number = Delegate.generate_ticket_number(event)
+            
+            db.session.commit()
+            flash(f'Payment verified and approved. {len(delegates)} delegate(s) marked as paid.', 'success')
+        
+        elif action == 'reject':
+            payment.status = 'failed'
+            payment.result_desc = f"Rejected by {current_user.name}. Reason: {notes}"
+            db.session.commit()
+            flash('Payment rejected.', 'warning')
+        
+        return redirect(url_for('payments.finance_payment_dashboard'))
+    
+    # Get linked delegates
+    delegates = Delegate.query.filter_by(payment_id=payment.id).all()
+    
+    return render_template('payments/verify_payment.html',
+        payment=payment,
+        delegates=delegates
+    )
+
+
+@payments_bp.route('/finance/receive', methods=['GET', 'POST'])
+@login_required
+def receive_payment():
+    """Receive cash/manual payment from chair"""
+    if current_user.role not in ['finance', 'admin', 'super_admin']:
+        flash('Access denied. Finance personnel only.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
+    
+    # Get all unpaid delegates grouped by chair
+    from app.models.user import User
+    chairs = User.query.filter(User.role.in_(['chair', 'registration_officer', 'data_clerk'])).all()
+    
+    unpaid_by_chair = {}
+    for chair in chairs:
+        unpaid = Delegate.query.filter_by(registered_by=chair.id, is_paid=False).all()
+        if unpaid:
+            unpaid_by_chair[chair] = unpaid
+    
+    if request.method == 'POST':
+        delegate_ids = request.form.getlist('delegate_ids')
+        receipt_number = request.form.get('receipt_number', '')
+        notes = request.form.get('notes', '')
+        
+        if not delegate_ids:
+            flash('Please select at least one delegate.', 'warning')
+            return redirect(url_for('payments.receive_payment'))
+        
+        delegates = Delegate.query.filter(Delegate.id.in_(delegate_ids)).all()
+        total_amount = len(delegates) * delegate_fee
+        
+        # Create payment record
+        payment = Payment(
+            user_id=current_user.id,
+            amount=total_amount,
+            payment_mode='Cash',
+            mpesa_receipt_number=receipt_number or f"CASH-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            result_desc=f"Cash received by {current_user.name}. {notes}",
+            delegates_count=len(delegates),
+            status='completed',
+            completed_at=datetime.utcnow()
+        )
+        db.session.add(payment)
+        db.session.flush()
+        
+        # Update delegates
+        for delegate in delegates:
+            delegate.payment_id = payment.id
+            delegate.is_paid = True
+            delegate.paid_at = datetime.utcnow()
+            if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                delegate.ticket_number = Delegate.generate_ticket_number(event)
+        
+        db.session.commit()
+        flash(f'Payment received for {len(delegates)} delegate(s). Total: KSh {total_amount:,}', 'success')
+        return redirect(url_for('payments.finance_payment_dashboard'))
+    
+    return render_template('payments/receive_payment.html',
+        unpaid_by_chair=unpaid_by_chair,
+        delegate_fee=delegate_fee
+    )
+
+
+@payments_bp.route('/finance/all')
+@login_required
+def all_payments():
+    """View all payments in the system"""
+    if current_user.role not in ['finance', 'admin', 'super_admin']:
+        flash('Access denied. Finance personnel only.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    status_filter = request.args.get('status', '')
+    method_filter = request.args.get('method', '')
+    from_date = request.args.get('from_date', '')
+    to_date = request.args.get('to_date', '')
+    
+    query = Payment.query
+    
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    
+    if method_filter:
+        query = query.filter_by(payment_mode=method_filter)
+    
+    if from_date:
+        try:
+            from_dt = datetime.strptime(from_date, '%Y-%m-%d')
+            query = query.filter(Payment.created_at >= from_dt)
+        except ValueError:
+            pass
+    
+    if to_date:
+        try:
+            to_dt = datetime.strptime(to_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+            query = query.filter(Payment.created_at <= to_dt)
+        except ValueError:
+            pass
+    
+    payments = query.order_by(Payment.created_at.desc()).all()
+    
+    return render_template('payments/all_payments.html',
+        payments=payments,
+        status_filter=status_filter
+    )
+
+
+@payments_bp.route('/finance/export')
+@login_required
+def export_payments():
+    """Export payments to CSV"""
+    if current_user.role not in ['finance', 'admin', 'super_admin']:
+        flash('Access denied. Finance personnel only.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    from flask import Response
+    import csv
+    from io import StringIO
+    
+    status_filter = request.args.get('status', '')
+    
+    query = Payment.query
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    
+    payments = query.order_by(Payment.created_at.desc()).all()
+    
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow(['ID', 'Transaction ID', 'Delegate', 'Phone', 'Amount', 'Method', 'Status', 'Date', 'Receipt', 'Notes'])
+    
+    for p in payments:
+        delegates_list = p.delegates.all()
+        delegate_name = delegates_list[0].name if delegates_list else 'N/A'
+        if len(delegates_list) > 1:
+            delegate_name = f"{delegate_name} (+{len(delegates_list)-1} more)"
+        writer.writerow([
+            p.id,
+            p.transaction_id or p.mpesa_receipt_number or '',
+            delegate_name,
+            p.phone_number or '',
+            p.amount,
+            p.payment_mode or '',
+            p.status,
+            p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '',
+            p.mpesa_receipt_number or '',
+            p.result_desc or ''
+        ])
+    
+    output.seek(0)
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=payments_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'}
+    )
+
+

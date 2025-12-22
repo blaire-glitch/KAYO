@@ -698,6 +698,59 @@
                         </li>
                         {% endif %}
                         
+                        {% if current_user.role == 'finance' %}
+                        <li><hr class="my-2" style="border-color: rgba(255,255,255,0.1);"></li>
+                        <li class="px-3"><small class="text-white-50 text-uppercase" style="font-size: 0.7rem;">Finance Management</small></li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'payments.finance_payment_dashboard' in request.endpoint %}active{% endif %}" href="{{ url_for('payments.finance_payment_dashboard') }}">
+                                <i class="bi bi-speedometer2"></i>Finance Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'payments.receive_payment' in request.endpoint %}active{% endif %}" href="{{ url_for('payments.receive_payment') }}">
+                                <i class="bi bi-cash-coin"></i>Receive Payments
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'payments.all_payments' in request.endpoint %}active{% endif %}" href="{{ url_for('payments.all_payments') }}">
+                                <i class="bi bi-list-check"></i>All Payments
+                            </a>
+                        </li>
+                        
+                        <li><hr class="my-2" style="border-color: rgba(255,255,255,0.1);"></li>
+                        <li class="px-3"><small class="text-white-50 text-uppercase" style="font-size: 0.7rem;">Accounting</small></li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.dashboard' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.dashboard') }}">
+                                <i class="bi bi-calculator"></i>Finance Overview
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.chart_of_accounts' in request.endpoint or 'finance.create_account' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.chart_of_accounts') }}">
+                                <i class="bi bi-folder2-open"></i>Chart of Accounts
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.list_journals' in request.endpoint or 'finance.create_journal' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.list_journals') }}">
+                                <i class="bi bi-journal-bookmark"></i>Journal Entries
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.list_vouchers' in request.endpoint or 'finance.create_voucher' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.list_vouchers') }}">
+                                <i class="bi bi-receipt"></i>Vouchers
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.budget' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.budget_overview') }}">
+                                <i class="bi bi-pie-chart"></i>Budget
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.reports' in request.endpoint or 'finance.trial_balance' in request.endpoint or 'finance.income_statement' in request.endpoint or 'finance.balance_sheet' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.reports_index') }}">
+                                <i class="bi bi-file-earmark-bar-graph"></i>Reports
+                            </a>
+                        </li>
+                        {% endif %}
+                        
                         <!-- Help Section for Chairs -->
                         {% if current_user.role in ['chair', 'finance', 'registration_officer', 'data_clerk'] %}
                         <li><hr class="my-2" style="border-color: rgba(255,255,255,0.1);"></li>

@@ -12,6 +12,10 @@ from app.models.fund_management import (
     FundTransfer, FundTransferApproval, PaymentSummary
 )
 from app.models.pending_delegate import PendingDelegate
+from app.models.finance import (
+    AccountCategory, Account, JournalEntry, JournalLine,
+    Voucher, VoucherItem, FinancialPeriod, BudgetLine
+)
 
 __all__ = [
     'User', 'Delegate', 'Payment',
@@ -21,5 +25,7 @@ __all__ = [
     'PermissionRequest',
     'Pledge', 'PledgePayment', 'ScheduledPayment', 'ScheduledPaymentInstallment',
     'FundTransfer', 'FundTransferApproval', 'PaymentSummary',
-    'PendingDelegate'
+    'PendingDelegate',
+    'AccountCategory', 'Account', 'JournalEntry', 'JournalLine',
+    'Voucher', 'VoucherItem', 'FinancialPeriod', 'BudgetLine'
 ]
