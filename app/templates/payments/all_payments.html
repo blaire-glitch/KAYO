@@ -189,6 +189,14 @@
                                             data-bs-toggle="modal" data-bs-target="#paymentModal{{ payment.id }}" title="Details">
                                         <i class="bi bi-eye"></i>
                                     </button>
+                                    <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" 
+                                          method="POST" class="d-inline" 
+                                          onsubmit="return confirm('Are you sure you want to delete this payment record?\n\nTransaction: {{ payment.transaction_id or payment.mpesa_receipt or 'N/A' }}\nAmount: KSh {{ '{:,.0f}'.format(payment.amount) }}');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -253,6 +261,14 @@
                                         </table>
                                     </div>
                                     <div class="modal-footer">
+                                        <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" 
+                                              method="POST" class="me-auto" 
+                                              onsubmit="return confirm('Are you sure you want to permanently delete this payment record?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="bi bi-trash me-1"></i>Delete Payment
+                                            </button>
+                                        </form>
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </div>

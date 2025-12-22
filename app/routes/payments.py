@@ -533,13 +533,16 @@ def delete_payment(payment_id):
     """Delete a specific payment record"""
     payment = Payment.query.get_or_404(payment_id)
     
-    # Check permission - users can delete their own, admins can delete any
-    if payment.user_id != current_user.id and current_user.role not in ['admin', 'super_admin']:
+    # Finance roles that can delete any payment
+    finance_roles = ['finance', 'treasurer', 'admin', 'super_admin']
+    
+    # Check permission - users can delete their own, finance/admins can delete any
+    if payment.user_id != current_user.id and current_user.role not in finance_roles:
         flash('You do not have permission to delete this payment.', 'error')
         return redirect(url_for('payments.payment_history'))
     
     # Only allow deleting non-completed payments for regular users
-    if payment.status == 'completed' and current_user.role not in ['admin', 'super_admin']:
+    if payment.status == 'completed' and current_user.role not in finance_roles:
         flash('Cannot delete completed payments. Contact admin.', 'error')
         return redirect(url_for('payments.payment_history'))
     

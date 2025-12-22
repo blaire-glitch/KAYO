@@ -121,9 +121,17 @@
                                     <td><strong>KSh {{ "{:,.0f}".format(payment.amount) }}</strong></td>
                                     <td><small>{{ payment.created_at.strftime('%d %b %H:%M') }}</small></td>
                                     <td>
-                                        <a href="{{ url_for('payments.verify_payment', payment_id=payment.id) }}" class="btn btn-sm btn-warning">
-                                            <i class="bi bi-check2-square"></i> Verify
-                                        </a>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('payments.verify_payment', payment_id=payment.id) }}" class="btn btn-warning">
+                                                <i class="bi bi-check2-square"></i> Verify
+                                            </a>
+                                            <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this pending payment?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -203,6 +211,7 @@
                                     <th>Amount</th>
                                     <th>Reason</th>
                                     <th>Date</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -212,6 +221,14 @@
                                     <td>KSh {{ "{:,.0f}".format(payment.amount) }}</td>
                                     <td><small class="text-muted">{{ payment.result_desc or 'Unknown' }}</small></td>
                                     <td><small>{{ payment.created_at.strftime('%d %b %H:%M') }}</small></td>
+                                    <td>
+                                        <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this failed payment record?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
