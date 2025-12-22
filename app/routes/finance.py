@@ -486,8 +486,10 @@ def create_journal():
         return redirect(url_for('finance.view_journal', entry_id=entry.id))
     
     accounts = Account.query.filter_by(is_active=True).order_by(Account.code).all()
+    # Convert to list of dicts for JSON serialization in template
+    accounts_data = [{'id': a.id, 'code': a.code, 'name': a.name} for a in accounts]
     return render_template('finance/create_journal.html',
-        accounts=accounts,
+        accounts=accounts_data,
         today=date.today()
     )
 
