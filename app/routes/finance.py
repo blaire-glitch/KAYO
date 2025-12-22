@@ -783,17 +783,22 @@ def cash_flow_statement():
 def budget_overview():
     """Budget overview and tracking"""
     budget_lines = BudgetLine.query.all()
+    periods = FinancialPeriod.query.order_by(FinancialPeriod.start_date.desc()).all()
     
     # Calculate totals
-    total_budgeted = sum(b.budgeted_amount for b in budget_lines)
-    total_actual = sum(b.actual_amount for b in budget_lines)
-    total_variance = total_budgeted - total_actual
+    total_budget = sum(b.budgeted_amount or 0 for b in budget_lines)
+    total_actual = sum(b.actual_amount or 0 for b in budget_lines)
+    variance = total_budget - total_actual
+    utilization = (total_actual / total_budget * 100) if total_budget > 0 else 0
     
     return render_template('finance/budget.html',
         budget_lines=budget_lines,
-        total_budgeted=total_budgeted,
+        periods=periods,
+        selected_period=None,
+        total_budget=total_budget,
         total_actual=total_actual,
-        total_variance=total_variance
+        variance=variance,
+        utilization=utilization
     )
 
 

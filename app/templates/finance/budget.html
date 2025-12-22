@@ -14,9 +14,9 @@
             <a href="{{ url_for('finance.dashboard') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i>Dashboard
             </a>
-            <a href="{{ url_for('finance.create_budget') }}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1"></i>Create Budget
-            </a>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLineModal">
+                <i class="bi bi-plus-lg me-1"></i>Add Budget Line
+            </button>
         </div>
     </div>
 
