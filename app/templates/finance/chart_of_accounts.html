@@ -113,7 +113,30 @@
 
         <!-- Assets -->
         <div class="tab-pane fade" id="assets">
-            {% include "finance/_account_table.html" with context %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    {% set type_accounts = accounts_by_type.get('asset', []) %}
+                    {% if type_accounts %}
+                    <table class="table table-hover">
+                        <thead>
+                            <tr><th>Code</th><th>Account Name</th><th class="text-end">Balance</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            {% for account in type_accounts %}
+                            <tr>
+                                <td><code>{{ account.code }}</code></td>
+                                <td>{{ account.name }}</td>
+                                <td class="text-end">KSh {{ "{:,.2f}".format(account.current_balance) }}</td>
+                                <td><a href="{{ url_for('finance.account_ledger', account_id=account.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-journal-text"></i></a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted text-center py-3">No asset accounts</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
         <!-- Liabilities -->
