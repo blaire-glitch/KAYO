@@ -31,7 +31,7 @@ class Account(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(20), unique=True, nullable=False)  # e.g., 1001, 1002
     name = db.Column(db.String(150), nullable=False)
-    category_id = db.Column(db.Integer, db.ForeignKey('account_categories.id'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('account_categories.id'), nullable=True)
     account_type = db.Column(db.String(50), nullable=False)  # asset, liability, equity, income, expense
     normal_balance = db.Column(db.String(10), nullable=False)  # debit or credit
     description = db.Column(db.Text)
