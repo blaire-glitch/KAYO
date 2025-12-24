@@ -8,7 +8,10 @@ from app.models.user import User
 from app.models.delegate import Delegate
 from app.models.payment import Payment
 from app.models.operations import CheckInRecord
+from app.models.fund_management import Pledge, ScheduledPayment, FundTransfer, FundTransferApproval, PaymentSummary
+from app.models.permission_request import PermissionRequest
 from app.forms import AdminUserForm, SearchForm, CheckInForm
+from sqlalchemy import text
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -356,6 +359,28 @@ def delete_user(id):
         # Check if we should delete delegates too
         delete_delegates = request.form.get('delete_delegates') == 'yes'
         
+        # Handle fund transfers - reassign to admin or delete
+        FundTransfer.query.filter_by(from_user_id=user.id).update({'from_user_id': current_user.id})
+        FundTransfer.query.filter_by(to_user_id=user.id).update({'to_user_id': current_user.id})
+        
+        # Handle fund transfer approvals
+        FundTransferApproval.query.filter_by(approved_by=user.id).update({'approved_by': current_user.id})
+        
+        # Handle pledges - reassign recorded_by
+        Pledge.query.filter_by(recorded_by=user.id).update({'recorded_by': current_user.id})
+        
+        # Handle scheduled payments - reassign recorded_by
+        ScheduledPayment.query.filter_by(recorded_by=user.id).update({'recorded_by': current_user.id})
+        
+        # Handle payment summaries
+        PaymentSummary.query.filter_by(user_id=user.id).update({'user_id': current_user.id})
+        
+        # Handle permission requests - delete them
+        PermissionRequest.query.filter_by(user_id=user.id).delete()
+        
+        # Handle payments - reassign to admin
+        Payment.query.filter_by(user_id=user.id).update({'user_id': current_user.id})
+        
         if delete_delegates and delegate_count > 0:
             # Delete all delegates registered by this user
             for delegate in user.delegates.all():
@@ -363,13 +388,9 @@ def delete_user(id):
                 CheckInRecord.query.filter_by(delegate_id=delegate.id).delete()
                 db.session.delete(delegate)
         elif delegate_count > 0:
-            # Reassign delegates to admin or unassign
-            # Just nullify the registered_by field or assign to current admin
+            # Reassign delegates to admin
             for delegate in user.delegates.all():
                 delegate.registered_by = current_user.id
-        
-        # Delete user's payments records (but keep payment records for audit)
-        # The Payment model has user_id foreign key, we'll just delete the user
         
         # Delete the user
         db.session.delete(user)
@@ -410,6 +431,28 @@ def delete_inactive_users():
         
         for user in inactive_users:
             user_delegates = user.delegates.count()
+            
+            # Handle fund transfers - reassign to admin
+            FundTransfer.query.filter_by(from_user_id=user.id).update({'from_user_id': current_user.id})
+            FundTransfer.query.filter_by(to_user_id=user.id).update({'to_user_id': current_user.id})
+            
+            # Handle fund transfer approvals
+            FundTransferApproval.query.filter_by(approved_by=user.id).update({'approved_by': current_user.id})
+            
+            # Handle pledges
+            Pledge.query.filter_by(recorded_by=user.id).update({'recorded_by': current_user.id})
+            
+            # Handle scheduled payments
+            ScheduledPayment.query.filter_by(recorded_by=user.id).update({'recorded_by': current_user.id})
+            
+            # Handle payment summaries
+            PaymentSummary.query.filter_by(user_id=user.id).update({'user_id': current_user.id})
+            
+            # Handle permission requests
+            PermissionRequest.query.filter_by(user_id=user.id).delete()
+            
+            # Handle payments
+            Payment.query.filter_by(user_id=user.id).update({'user_id': current_user.id})
             
             # Delete user's delegates
             for delegate in user.delegates.all():
