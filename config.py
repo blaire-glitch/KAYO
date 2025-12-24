@@ -35,3 +35,4 @@ class Config:
     
     # Delegate registration fee (in KSh)
     DELEGATE_FEE = 1000
+    REDUCED_FEE = 500  # For counsellors and intercessors

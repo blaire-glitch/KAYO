@@ -20,6 +20,9 @@ class Delegate(db.Model):
     # Categories exempt from registration fees
     FEE_EXEMPT_CATEGORIES = ['nav', 'arise_band']
     
+    # Categories with reduced fees (500 KSh instead of 1000 KSh)
+    REDUCED_FEE_CATEGORIES = ['counsellor', 'intercessor']
+    
     id = db.Column(db.Integer, primary_key=True)
     ticket_number = db.Column(db.String(20), unique=True, nullable=False)
     delegate_number = db.Column(db.Integer, nullable=True)  # Auto-assigned sequential number
@@ -66,17 +69,25 @@ class Delegate(db.Model):
         """Check if this delegate is exempt from registration fees"""
         return self.category in self.FEE_EXEMPT_CATEGORIES
     
+    def is_reduced_fee(self):
+        """Check if this delegate has reduced registration fee"""
+        return self.category in self.REDUCED_FEE_CATEGORIES
+    
     def get_registration_fee(self):
         """Get the registration fee for this delegate based on category"""
         if self.is_fee_exempt():
             return 0
+        
+        # Check if delegate has reduced fee (counsellors, intercessors)
+        from flask import current_app
+        if self.is_reduced_fee():
+            return current_app.config.get('REDUCED_FEE', 500)
         
         # Check if delegate has a pricing tier
         if self.pricing_tier:
             return self.pricing_tier.price
         
         # Fall back to default fee from config
-        from flask import current_app
         return current_app.config.get('DELEGATE_FEE', 1000)
     
     def get_custom_field_values(self):
