@@ -331,6 +331,106 @@ def toggle_user_active(id):
     return redirect(url_for('admin.all_users'))
 
 
+@admin_bp.route('/users/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(id):
+    """Permanently delete a user and optionally their delegates"""
+    user = User.query.get_or_404(id)
+    
+    # Don't allow deleting yourself
+    if user.id == current_user.id:
+        flash('You cannot delete your own account.', 'danger')
+        return redirect(url_for('admin.all_users'))
+    
+    # Don't allow deleting super_admin
+    if user.role == 'super_admin':
+        flash('Super admin accounts cannot be deleted.', 'danger')
+        return redirect(url_for('admin.all_users'))
+    
+    try:
+        user_name = user.name
+        user_email = user.email
+        delegate_count = user.delegates.count()
+        
+        # Check if we should delete delegates too
+        delete_delegates = request.form.get('delete_delegates') == 'yes'
+        
+        if delete_delegates and delegate_count > 0:
+            # Delete all delegates registered by this user
+            for delegate in user.delegates.all():
+                # Delete check-in records first
+                CheckInRecord.query.filter_by(delegate_id=delegate.id).delete()
+                db.session.delete(delegate)
+        elif delegate_count > 0:
+            # Reassign delegates to admin or unassign
+            # Just nullify the registered_by field or assign to current admin
+            for delegate in user.delegates.all():
+                delegate.registered_by = current_user.id
+        
+        # Delete user's payments records (but keep payment records for audit)
+        # The Payment model has user_id foreign key, we'll just delete the user
+        
+        # Delete the user
+        db.session.delete(user)
+        db.session.commit()
+        
+        if delete_delegates:
+            flash(f'User "{user_name}" ({user_email}) and their {delegate_count} delegates deleted successfully.', 'success')
+        else:
+            flash(f'User "{user_name}" ({user_email}) deleted successfully. {delegate_count} delegates were reassigned to you.', 'success')
+            
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error deleting user {id}: {str(e)}')
+        flash(f'Error deleting user: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.all_users'))
+
+
+@admin_bp.route('/users/delete-inactive', methods=['POST'])
+@login_required
+@admin_required
+def delete_inactive_users():
+    """Delete all inactive users (bulk action)"""
+    try:
+        # Get all inactive users except admins and super_admins
+        inactive_users = User.query.filter(
+            User.is_active == False,
+            User.role.notin_(['admin', 'super_admin']),
+            User.id != current_user.id
+        ).all()
+        
+        if not inactive_users:
+            flash('No inactive users to delete.', 'info')
+            return redirect(url_for('admin.all_users'))
+        
+        deleted_count = 0
+        delegate_count = 0
+        
+        for user in inactive_users:
+            user_delegates = user.delegates.count()
+            
+            # Delete user's delegates
+            for delegate in user.delegates.all():
+                CheckInRecord.query.filter_by(delegate_id=delegate.id).delete()
+                db.session.delete(delegate)
+                delegate_count += 1
+            
+            db.session.delete(user)
+            deleted_count += 1
+        
+        db.session.commit()
+        flash(f'Deleted {deleted_count} inactive users and {delegate_count} associated delegates.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error deleting inactive users: {str(e)}')
+        flash(f'Error deleting inactive users: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.all_users'))
+
+
 @admin_bp.route('/payments')
 @login_required
 @admin_required
