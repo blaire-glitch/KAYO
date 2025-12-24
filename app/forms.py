@@ -94,7 +94,7 @@ class DelegateForm(FlaskForm):
     category = SelectField('Category', choices=[
         ('delegate', 'Delegate'),
         ('counsellor', 'Counsellor'),
-        ('youth_minister', 'Youth Minister'),
+        ('archdeaconry_chair', 'Archdeaconry Chair'),
         ('nav', 'NAV (Worship Team)'),
         ('intercessor', 'Intercessor'),
         ('clergy', 'Clergy'),
@@ -186,7 +186,7 @@ class SearchForm(FlaskForm):
         ('', 'All Categories'),
         ('delegate', 'Delegate'),
         ('counsellor', 'Counsellor'),
-        ('youth_minister', 'Youth Minister'),
+        ('archdeaconry_chair', 'Archdeaconry Chair'),
         ('nav', 'NAV (Worship Team)'),
         ('intercessor', 'Intercessor'),
         ('clergy', 'Clergy'),

@@ -1,6 +1,7 @@
 """
-Script to create Youth Minister accounts for all Archdeaconries.
-Email format: archdeaconryname.ym@kayo.com (lowercase, no spaces)
+Script to create Archdeaconry Chair accounts for all Archdeaconries.
+Archdeaconry Chairs can register Intercessors and Counsellors for their archdeaconry.
+Email format: archdeaconryname.chair@kayo.com (lowercase, no spaces)
 Password format: archdeaconryname123
 
 Run this once:
@@ -20,7 +21,7 @@ def create_archdeaconry_accounts():
         skipped_count = 0
         
         print("=" * 60)
-        print("Creating Youth Minister Accounts for All Archdeaconries")
+        print("Creating Archdeaconry Chair Accounts for All Archdeaconries")
         print("=" * 60)
         print()
         
@@ -29,8 +30,8 @@ def create_archdeaconry_accounts():
             arch_name_clean = archdeaconry.replace(" Archdeaconry", "").replace("'s", "").replace(".", "")
             arch_name_clean = arch_name_clean.replace(" ", "").replace("-", "").lower()
             
-            # Use .ym suffix to distinguish from parish accounts
-            email = f"{arch_name_clean}.ym@kayo.com"
+            # Use .chair suffix for archdeaconry chair accounts
+            email = f"{arch_name_clean}.chair@kayo.com"
             password = f"{arch_name_clean}123"
             
             # Check if user already exists
@@ -42,12 +43,14 @@ def create_archdeaconry_accounts():
             
             # Create new user
             user = User(
-                name=f"{archdeaconry} Youth Minister",
+                name=f"{archdeaconry} Chair",
                 email=email,
-                role='youth_minister',
+                role='archdeaconry_chair',
                 archdeaconry=archdeaconry,
                 oauth_provider='local',
-                is_active=True
+                is_active=True,
+                is_approved=True,
+                approval_status='approved'
             )
             user.set_password(password)
             db.session.add(user)
@@ -65,7 +68,7 @@ def create_archdeaconry_accounts():
         print("=" * 60)
         
         # Print summary table
-        print("\n📋 ARCHDEACONRY YOUTH MINISTER ACCOUNT SUMMARY")
+        print("\n📋 ARCHDEACONRY CHAIR ACCOUNT SUMMARY")
         print("=" * 70)
         print(f"{'Archdeaconry':<30} {'Email':<25} {'Password':<15}")
         print("-" * 70)
@@ -73,7 +76,7 @@ def create_archdeaconry_accounts():
         for archdeaconry in sorted(CHURCH_DATA.keys()):
             arch_name_clean = archdeaconry.replace(" Archdeaconry", "").replace("'s", "").replace(".", "")
             arch_name_clean = arch_name_clean.replace(" ", "").replace("-", "").lower()
-            email = f"{arch_name_clean}.ym@kayo.com"
+            email = f"{arch_name_clean}.chair@kayo.com"
             password = f"{arch_name_clean}123"
             print(f"{archdeaconry:<30} {email:<25} {password:<15}")
 

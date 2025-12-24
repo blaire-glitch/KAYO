@@ -131,7 +131,10 @@ Your latest payment transactions with amounts and status
 
    **Category** (Optional):
    - **Delegate**: Regular attendee (default)
-   - **Leader**: Youth leaders
+   - **Counsellor**: Youth counsellors
+   - **Intercessor**: Prayer intercessors
+   - **NAV**: Worship Team members
+   - **Clergy**: Church clergy
    - **Speaker**: Event speakers
    - **VIP**: Special guests
 

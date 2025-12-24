@@ -112,8 +112,8 @@ def add_missing_columns():
         default_roles = [
             ('super_admin', 'Full system access', json.dumps(['*']), 1, now),
             ('admin', 'Event administration', json.dumps(['delegates.*', 'payments.*', 'reports.*']), 1, now),
-            ('chair', 'Church chairperson', json.dumps(['delegates.create', 'delegates.view']), 1, now),
-            ('youth_minister', 'Youth minister', json.dumps(['delegates.create', 'delegates.view']), 1, now),
+            ('chair', 'Parish chairperson', json.dumps(['delegates.create', 'delegates.view']), 1, now),
+            ('archdeaconry_chair', 'Archdeaconry chair - registers intercessors and counsellors', json.dumps(['delegates.create', 'delegates.view', 'intercessors.create', 'intercessors.view', 'counsellors.create', 'counsellors.view']), 1, now),
         ]
         
         cursor.executemany(

@@ -1,5 +1,5 @@
 """
-Script to add Chair and Youth Minister roles to the database.
+Script to add Chair and Archdeaconry Chair roles to the database.
 Run this once after updating the code:
     python add_new_roles.py
 """
@@ -16,7 +16,7 @@ def add_new_roles():
         new_roles = [
             {
                 'name': 'chair',
-                'description': 'Church Chair - can register delegates from their church',
+                'description': 'Parish Chair - can register delegates from their parish',
                 'permissions': [
                     'delegates.view', 'delegates.create', 'delegates.edit',
                     'payments.view', 'payments.process',
@@ -26,10 +26,12 @@ def add_new_roles():
                 'is_system': True
             },
             {
-                'name': 'youth_minister',
-                'description': 'Youth Minister - can register and manage delegates',
+                'name': 'archdeaconry_chair',
+                'description': 'Archdeaconry Chair - can register intercessors and counsellors for their archdeaconry',
                 'permissions': [
                     'delegates.view', 'delegates.create', 'delegates.edit',
+                    'intercessors.create', 'intercessors.view', 'intercessors.edit',
+                    'counsellors.create', 'counsellors.view', 'counsellors.edit',
                     'payments.view', 'payments.process',
                     'check_in.view',
                     'reports.view',

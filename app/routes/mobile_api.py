@@ -1056,7 +1056,7 @@ def get_upload_template():
             'required_columns': ['Name', 'Gender', 'Local Church', 'Parish', 'Archdeaconry'],
             'optional_columns': ['Phone Number', 'ID Number', 'Category'],
             'gender_values': ['Male', 'Female'],
-            'category_values': ['delegate', 'leader', 'speaker', 'vip'],
+            'category_values': ['delegate', 'counsellor', 'archdeaconry_chair', 'nav', 'intercessor', 'clergy', 'arise_band', 'speaker', 'vip'],
             'example_row': {
                 'Name': 'John Doe',
                 'Gender': 'Male',
