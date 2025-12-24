@@ -11,8 +11,8 @@ Run this once after deploying the updated code:
 
 from app import create_app, db
 from app.models.user import User
-from app.models.delegate import Delegate
 from app.models.audit import Role
+from sqlalchemy import text
 
 app = create_app()
 
@@ -72,18 +72,21 @@ def migrate_to_archdeaconry_chair():
         if migrated_users == 0:
             print("  ℹ No youth_minister users found to migrate")
         
-        # Step 3: Update delegates with youth_minister category
+        # Step 3: Update delegates with youth_minister category using raw SQL
         print("\nStep 3: Updating delegate categories...")
-        ym_delegates = Delegate.query.filter_by(category='youth_minister').all()
-        migrated_delegates = 0
-        
-        for delegate in ym_delegates:
-            delegate.category = 'archdeaconry_chair'
-            migrated_delegates += 1
-            print(f"  ✅ {delegate.name} category updated to archdeaconry_chair")
-        
-        if migrated_delegates == 0:
-            print("  ℹ No delegates with youth_minister category found")
+        try:
+            # Use raw SQL to avoid model column issues
+            result = db.session.execute(
+                text("UPDATE delegates SET category = 'archdeaconry_chair' WHERE category = 'youth_minister'")
+            )
+            migrated_delegates = result.rowcount
+            if migrated_delegates > 0:
+                print(f"  ✅ Updated {migrated_delegates} delegates from youth_minister to archdeaconry_chair")
+            else:
+                print("  ℹ No delegates with youth_minister category found")
+        except Exception as e:
+            print(f"  ⚠️ Could not update delegates: {e}")
+            migrated_delegates = 0
         
         # Step 4: Optionally remove the old youth_minister role
         print("\nStep 4: Handling old youth_minister role...")
