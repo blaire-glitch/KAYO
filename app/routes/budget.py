@@ -188,11 +188,11 @@ def view(id):
         category = item.category
         if category not in items_by_category:
             items_by_category[category] = {
-                'items': [],
+                'budget_items': [],
                 'total_budgeted': 0,
                 'total_spent': 0
             }
-        items_by_category[category]['items'].append(item)
+        items_by_category[category]['budget_items'].append(item)
         items_by_category[category]['total_budgeted'] += item.budgeted_amount
         items_by_category[category]['total_spent'] += item.actual_spent
     
