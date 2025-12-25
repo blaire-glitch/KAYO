@@ -115,6 +115,109 @@
             padding: 15px;
         }
         
+        /* Global Search Styles */
+        .search-results-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            z-index: 1050;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 5px;
+        }
+        
+        [data-bs-theme="dark"] .search-results-dropdown {
+            background: #2d3238;
+        }
+        
+        .search-result-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: background 0.2s;
+        }
+        
+        .search-result-item:hover,
+        .search-result-item.active {
+            background: rgba(26, 95, 42, 0.1);
+        }
+        
+        [data-bs-theme="dark"] .search-result-item:hover,
+        [data-bs-theme="dark"] .search-result-item.active {
+            background: rgba(45, 143, 66, 0.2);
+        }
+        
+        .search-result-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 1.2rem;
+        }
+        
+        .search-result-icon.delegate { background: #e3f2fd; color: #1976d2; }
+        .search-result-icon.user { background: #f3e5f5; color: #7b1fa2; }
+        .search-result-icon.payment { background: #e8f5e9; color: #388e3c; }
+        .search-result-icon.event { background: #fff3e0; color: #f57c00; }
+        
+        .search-result-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .search-result-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .search-result-subtitle {
+            font-size: 0.8rem;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .search-no-results {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+        
+        .search-category-header {
+            padding: 8px 16px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            background: #f8f9fa;
+        }
+        
+        [data-bs-theme="dark"] .search-category-header {
+            background: #1a1d20;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        
         /* Cards */
         .card {
             border: none;
@@ -481,6 +584,27 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated %}
+                <!-- Global Search -->
+                <div class="mx-auto position-relative" style="width: 100%; max-width: 400px;">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0" id="globalSearch" 
+                               placeholder="Search delegates, payments, events..." 
+                               autocomplete="off">
+                        <span class="input-group-text bg-white d-none" id="searchSpinner">
+                            <i class="bi bi-arrow-repeat spin"></i>
+                        </span>
+                    </div>
+                    <!-- Search Results Dropdown -->
+                    <div class="search-results-dropdown" id="searchResults" style="display: none;">
+                        <div class="search-results-list"></div>
+                    </div>
+                </div>
+                {% endif %}
+                
                 <ul class="navbar-nav ms-auto align-items-center">
                     <!-- Dark Mode Toggle -->
                     <li class="nav-item">
@@ -848,6 +972,141 @@
     
     <!-- Scripts -->
     <script>
+        // Global Search Functionality
+        (function() {
+            const searchInput = document.getElementById('globalSearch');
+            const searchResults = document.getElementById('searchResults');
+            const searchSpinner = document.getElementById('searchSpinner');
+            let searchTimeout = null;
+            let selectedIndex = -1;
+            
+            if (!searchInput) return;
+            
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                // Clear previous timeout
+                if (searchTimeout) clearTimeout(searchTimeout);
+                
+                if (query.length < 2) {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                // Debounce search
+                searchSpinner.classList.remove('d-none');
+                searchTimeout = setTimeout(() => performSearch(query), 300);
+            });
+            
+            searchInput.addEventListener('keydown', function(e) {
+                const items = searchResults.querySelectorAll('.search-result-item');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                    updateSelection(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    updateSelection(items);
+                } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                    e.preventDefault();
+                    items[selectedIndex].click();
+                } else if (e.key === 'Escape') {
+                    searchResults.style.display = 'none';
+                    searchInput.blur();
+                }
+            });
+            
+            function updateSelection(items) {
+                items.forEach((item, i) => {
+                    item.classList.toggle('active', i === selectedIndex);
+                });
+                if (items[selectedIndex]) {
+                    items[selectedIndex].scrollIntoView({ block: 'nearest' });
+                }
+            }
+            
+            async function performSearch(query) {
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+                    displayResults(data.results);
+                } catch (error) {
+                    console.error('Search error:', error);
+                } finally {
+                    searchSpinner.classList.add('d-none');
+                }
+            }
+            
+            function displayResults(results) {
+                selectedIndex = -1;
+                const list = searchResults.querySelector('.search-results-list');
+                
+                if (results.length === 0) {
+                    list.innerHTML = '<div class="search-no-results"><i class="bi bi-search me-2"></i>No results found</div>';
+                    searchResults.style.display = 'block';
+                    return;
+                }
+                
+                // Group by type
+                const grouped = {};
+                results.forEach(r => {
+                    if (!grouped[r.type]) grouped[r.type] = [];
+                    grouped[r.type].push(r);
+                });
+                
+                let html = '';
+                const typeNames = { delegate: 'Delegates', user: 'Users', payment: 'Payments', event: 'Events' };
+                
+                for (const [type, items] of Object.entries(grouped)) {
+                    html += `<div class="search-category-header">${typeNames[type] || type}</div>`;
+                    items.forEach(item => {
+                        const badgeClass = item.badge === 'approved' || item.badge === 'Active' ? 'success' : 
+                                          item.badge === 'pending' ? 'warning' : 'secondary';
+                        html += `
+                            <div class="search-result-item" data-url="${item.url}">
+                                <div class="search-result-icon ${item.type}">
+                                    <i class="bi ${item.icon}"></i>
+                                </div>
+                                <div class="search-result-content">
+                                    <div class="search-result-title">${item.title}</div>
+                                    <div class="search-result-subtitle">${item.subtitle}</div>
+                                </div>
+                                <span class="badge bg-${badgeClass}">${item.badge}</span>
+                            </div>
+                        `;
+                    });
+                }
+                
+                list.innerHTML = html;
+                searchResults.style.display = 'block';
+                
+                // Add click handlers
+                list.querySelectorAll('.search-result-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        window.location.href = this.dataset.url;
+                    });
+                });
+            }
+            
+            // Close results when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                    searchResults.style.display = 'none';
+                }
+            });
+            
+            // Keyboard shortcut: Ctrl+K or / to focus search
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT')) {
+                    e.preventDefault();
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            });
+        })();
+        
         // Dark Mode
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-bs-theme', savedTheme);
