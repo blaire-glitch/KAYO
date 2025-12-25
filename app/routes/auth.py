@@ -233,8 +233,9 @@ def register():
 @auth_bp.route('/logout')
 @login_required
 def logout():
-    # Mark session as inactive (with error handling)
+    # Mark session as inactive (with error handling for missing table)
     try:
+        from app.models.session import UserSession
         token = session.get('session_token')
         if token:
             session_record = UserSession.query.filter_by(
@@ -245,8 +246,11 @@ def logout():
                 session_record.is_active = False
                 db.session.commit()
     except Exception as e:
-        current_app.logger.error(f"Error deactivating session: {e}")
-        db.session.rollback()
+        current_app.logger.error(f"Error deactivating session (table may not exist): {e}")
+        try:
+            db.session.rollback()
+        except:
+            pass
     
     logout_user()
     flash('You have been logged out.', 'info')
