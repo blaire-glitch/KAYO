@@ -93,6 +93,18 @@ def dashboard():
         category_stats_raw = Delegate.get_category_stats()
         category_stats = [{'category': row.category or 'Delegate', 'count': row.count} for row in category_stats_raw]
         
+        # Get age bracket stats
+        age_bracket_stats_raw = Delegate.get_age_bracket_stats()
+        age_bracket_labels = {
+            '15_below': '15 and Below',
+            '15_19': '15-19',
+            '20_24': '20-24',
+            '25_29': '25-29',
+            '30_above': '30 and Above'
+        }
+        age_bracket_stats = [{'age_bracket': age_bracket_labels.get(row.age_bracket, row.age_bracket or 'Unknown'), 
+                             'count': row.count} for row in age_bracket_stats_raw]
+        
         # Get daily registration stats (last 30 days)
         daily_stats_raw = Delegate.get_daily_registration_stats(30)
         daily_stats = [{'date': str(row.date), 'count': row.count} for row in daily_stats_raw]
@@ -111,6 +123,7 @@ def dashboard():
             parish_stats=parish_stats,
             gender_stats=gender_stats,
             category_stats=category_stats,
+            age_bracket_stats=age_bracket_stats,
             daily_stats=daily_stats,
             total_users=total_users,
             payments=payments,

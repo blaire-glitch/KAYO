@@ -466,7 +466,7 @@
 <!-- DYO Charts Row -->
 <div class="row mb-4">
     <!-- Archdeaconry Stats -->
-    <div class="col-lg-6 mb-4">
+    <div class="col-lg-4 col-md-6 mb-4">
         <div class="card h-100">
             <div class="card-header bg-white">
                 <h5 class="mb-0"><i class="bi bi-building me-2"></i>By Archdeaconry</h5>
@@ -508,10 +508,10 @@
     </div>
     
     <!-- Gender Stats -->
-    <div class="col-lg-3 mb-4">
+    <div class="col-lg-2 col-md-6 mb-4">
         <div class="card h-100">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-gender-ambiguous me-2"></i>By Gender</h5>
+                <h5 class="mb-0"><i class="bi bi-gender-ambiguous me-2"></i>Gender</h5>
             </div>
             <div class="card-body">
                 {% if gender_stats %}
@@ -537,11 +537,40 @@
         </div>
     </div>
     
-    <!-- Category Stats -->
-    <div class="col-lg-3 mb-4">
+    <!-- Age Bracket Stats -->
+    <div class="col-lg-3 col-md-6 mb-4">
         <div class="card h-100">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-tags me-2"></i>By Category</h5>
+                <h5 class="mb-0"><i class="bi bi-bar-chart-steps me-2"></i>Age</h5>
+            </div>
+            <div class="card-body">
+                {% if age_bracket_stats %}
+                <div class="text-center">
+                    {% for stat in age_bracket_stats %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small">{{ stat.age_bracket }}</span>
+                            <strong>{{ stat.count }}</strong>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            {% set pct = (stat.count / total_delegates * 100) if total_delegates > 0 else 0 %}
+                            <div class="progress-bar bg-info" style="width: {{ pct }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-3">No data</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Stats -->
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Category</h5>
             </div>
             <div class="card-body">
                 {% if category_stats %}

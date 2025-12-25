@@ -166,7 +166,7 @@ class Analytics:
     @staticmethod
     def get_demographic_insights(event_id=None):
         """
-        Get demographic breakdown: gender, category distribution
+        Get demographic breakdown: gender, age brackets, category distribution
         """
         base_query = Delegate.query
         if event_id:
@@ -180,6 +180,24 @@ class Analytics:
         if event_id:
             gender_stats = gender_stats.filter(Delegate.event_id == event_id)
         gender_stats = gender_stats.group_by(Delegate.gender).all()
+        
+        # Age bracket distribution
+        age_stats = db.session.query(
+            Delegate.age_bracket,
+            func.count(Delegate.id).label('count')
+        )
+        if event_id:
+            age_stats = age_stats.filter(Delegate.event_id == event_id)
+        age_stats = age_stats.group_by(Delegate.age_bracket).all()
+        
+        # Map age bracket codes to display labels
+        age_bracket_labels = {
+            '15_below': '15 and Below',
+            '15_19': '15-19',
+            '20_24': '20-24',
+            '25_29': '25-29',
+            '30_above': '30 and Above'
+        }
         
         # Category distribution
         category_stats = db.session.query(
@@ -209,6 +227,11 @@ class Analytics:
             'gender': [{'label': g.gender or 'Unknown', 'count': g.count, 
                        'percent': round(g.count / total * 100, 1) if total > 0 else 0} 
                       for g in gender_stats],
+            'age_brackets': [{'label': age_bracket_labels.get(a.age_bracket, a.age_bracket or 'Unknown'), 
+                             'code': a.age_bracket or 'unknown',
+                             'count': a.count,
+                             'percent': round(a.count / total * 100, 1) if total > 0 else 0}
+                            for a in age_stats],
             'categories': [{'label': c.category or 'Delegate', 'count': c.count,
                            'percent': round(c.count / total * 100, 1) if total > 0 else 0}
                           for c in category_stats],
