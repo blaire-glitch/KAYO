@@ -11,7 +11,7 @@
                 <i class="fas fa-clock text-warning me-2"></i>
                 Pending Payment Approvals
             </h2>
-            <p class="text-muted mb-0">Review and approve payments submitted by parish chairs</p>
+            <p class="text-muted mb-0">Review and approve cash payments submitted by parish chairs</p>
         </div>
         <div>
             <a href="{{ url_for('finance.approved_payments') }}" class="btn btn-outline-success me-2">
@@ -20,6 +20,25 @@
             <a href="{{ url_for('finance.rejected_payments') }}" class="btn btn-outline-danger">
                 <i class="fas fa-times-circle me-1"></i> Rejected
             </a>
+        </div>
+    </div>
+
+    <!-- Workflow Info -->
+    <div class="alert alert-info mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Payment Approval Workflow</h6>
+                <p class="mb-0 small">
+                    <strong>Step 1:</strong> Chair confirms receipt of cash from delegates<br>
+                    <strong>Step 2:</strong> Chair delivers the cash to you (Finance)<br>
+                    <strong>Step 3:</strong> Once you receive the cash, approve the payment below to issue tickets
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                <a href="{{ url_for('payments.receive_payment') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i> Direct Payment Entry
+                </a>
+            </div>
         </div>
     </div>
 
@@ -156,27 +175,31 @@
                                     <form action="{{ url_for('finance.approve_payment', payment_id=payment.id) }}" method="POST">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <div class="modal-body">
+                                            <div class="alert alert-warning">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                                <strong>Confirm you have received the cash from the chair!</strong>
+                                            </div>
                                             <div class="alert alert-info">
                                                 <strong>Amount:</strong> KES {{ "{:,.2f}".format(payment.amount) }}<br>
                                                 <strong>Delegates:</strong> {{ payment.delegates|length }}<br>
-                                                <strong>Method:</strong> {{ payment.payment_method|upper if payment.payment_method else 'CASH' }}
+                                                <strong>Submitted by:</strong> {{ payment.confirmed_by_chair.full_name if payment.confirmed_by_chair else 'Unknown' }}
                                             </div>
-                                            <p>Are you sure you want to approve this payment? This will:</p>
+                                            <p>Approving this payment will:</p>
                                             <ul>
-                                                <li>Mark {{ payment.delegates|length }} delegate(s) as paid</li>
-                                                <li>Issue tickets to delegates</li>
+                                                <li>Mark {{ payment.delegates|length }} delegate(s) as <strong>PAID</strong></li>
+                                                <li><strong>Issue tickets</strong> to delegates</li>
                                                 <li>Complete the payment transaction</li>
                                             </ul>
                                             <div class="mb-3">
                                                 <label class="form-label">Notes (optional)</label>
                                                 <textarea name="notes" class="form-control" rows="2" 
-                                                          placeholder="Add any notes about this approval..."></textarea>
+                                                          placeholder="e.g., Cash received in full"></textarea>
                                             </div>
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                             <button type="submit" class="btn btn-success">
-                                                <i class="fas fa-check me-1"></i> Approve Payment
+                                                <i class="fas fa-check me-1"></i> Confirm Receipt & Approve
                                             </button>
                                         </div>
                                     </form>

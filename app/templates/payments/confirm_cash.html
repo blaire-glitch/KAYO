@@ -8,11 +8,41 @@
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('payments.payment_page') }}">Payments</a></li>
-            <li class="breadcrumb-item active">Confirm Cash Payments</li>
+            <li class="breadcrumb-item active">Confirm Cash Receipts</li>
         </ol>
     </nav>
-    <h2><i class="bi bi-cash me-2"></i>Confirm Cash Payments</h2>
-    <p class="text-muted">Select delegates who have paid cash to confirm their payment and issue tickets.</p>
+    <h2><i class="bi bi-cash me-2"></i>Confirm Cash Receipts from Delegates</h2>
+    {% if current_user.role == 'chair' %}
+    <p class="text-muted">Select delegates who have paid you cash. After confirmation, this will be submitted to Finance for final approval.</p>
+    
+    <!-- Workflow Steps -->
+    <div class="alert alert-info">
+        <h6 class="alert-heading"><i class="bi bi-diagram-3 me-2"></i>Payment Workflow</h6>
+        <div class="d-flex justify-content-between align-items-center mt-3 small">
+            <div class="text-center">
+                <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:35px;height:35px;">1</div>
+                <p class="mb-0 mt-1"><strong>Receive Cash</strong><br>From delegate</p>
+            </div>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <div class="text-center">
+                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:35px;height:35px;">2</div>
+                <p class="mb-0 mt-1"><strong>Confirm Here</strong><br>You are here</p>
+            </div>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <div class="text-center">
+                <div class="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center" style="width:35px;height:35px;">3</div>
+                <p class="mb-0 mt-1"><strong>Send to Finance</strong><br>Submit for approval</p>
+            </div>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <div class="text-center">
+                <div class="bg-secondary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:35px;height:35px;">4</div>
+                <p class="mb-0 mt-1"><strong>Finance Approves</strong><br>Ticket issued</p>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-muted">Select delegates and confirm their cash payment. As Finance, payments will be approved immediately.</p>
+    {% endif %}
 </div>
 
 <div class="row">
@@ -77,7 +107,13 @@
         {% if unpaid_delegates %}
         <div class="card sticky-top" style="top: 20px;">
             <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Confirm Payment</h5>
+                <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>
+                    {% if current_user.role == 'chair' %}
+                    Confirm Receipt & Submit
+                    {% else %}
+                    Confirm Payment
+                    {% endif %}
+                </h5>
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('payments.confirm_cash_payment') }}" id="confirmForm" class="no-mask">
@@ -92,7 +128,7 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Total Amount</label>
+                        <label class="form-label">Total Amount Received</label>
                         <div class="input-group input-group-lg">
                             <span class="input-group-text">KSh</span>
                             <input type="text" class="form-control" id="totalAmount" name="amount" value="0" readonly>
@@ -111,9 +147,18 @@
                     </div>
                     
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
-                            <i class="bi bi-check-circle me-2"></i>Confirm Cash Payment
+                        {% if current_user.role == 'chair' %}
+                        <button type="submit" class="btn btn-warning btn-lg" id="submitBtn" disabled>
+                            <i class="bi bi-send me-2"></i>Confirm & Submit to Finance
                         </button>
+                        <small class="text-center text-muted mt-2">
+                            <i class="bi bi-info-circle"></i> Finance will approve once they receive the money from you
+                        </small>
+                        {% else %}
+                        <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
+                            <i class="bi bi-check-circle me-2"></i>Confirm & Issue Tickets
+                        </button>
+                        {% endif %}
                     </div>
                 </form>
             </div>
@@ -124,14 +169,38 @@
             <div class="card-body">
                 <h6><i class="bi bi-info-circle me-2"></i>Instructions</h6>
                 <hr>
+                {% if current_user.role == 'chair' %}
+                <ol class="small mb-0">
+                    <li class="mb-2">Receive cash payment from delegates</li>
+                    <li class="mb-2">Select the delegates who have paid you</li>
+                    <li class="mb-2">Verify the total amount matches cash received</li>
+                    <li class="mb-2">Click "Confirm & Submit to Finance"</li>
+                    <li class="mb-2"><strong>Important:</strong> Deliver the cash to Finance</li>
+                    <li>Finance will approve once they receive the money</li>
+                </ol>
+                {% else %}
                 <ol class="small mb-0">
                     <li class="mb-2">Select the delegates who have paid cash</li>
                     <li class="mb-2">Verify the total amount matches cash received</li>
                     <li class="mb-2">Optionally enter a receipt number</li>
-                    <li>Click "Confirm Cash Payment" to issue tickets</li>
+                    <li>Click "Confirm & Issue Tickets"</li>
                 </ol>
+                {% endif %}
             </div>
         </div>
+        
+        {% if current_user.role == 'chair' %}
+        <div class="card mt-3">
+            <div class="card-body text-center">
+                <h6><i class="bi bi-hourglass-split me-2"></i>Previous Submissions</h6>
+                <hr>
+                <a href="{{ url_for('payments.my_submissions') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-list-check me-1"></i>View My Submissions
+                </a>
+                <small class="d-block text-muted mt-2">Track status of your submitted payments</small>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
