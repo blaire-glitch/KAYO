@@ -26,19 +26,19 @@ def payment_page():
         Delegate.payment_id == None  # Not already linked to a payment
     ).all()
     
+    # Get delegates pending finance approval
+    pending_approval_delegates = Delegate.query.filter(
+        Delegate.registered_by == current_user.id,
+        Delegate.is_paid == False,
+        Delegate.payment_id != None  # Linked to a pending payment
+    ).all()
+    
     # Separate fee-exempt and fee-required delegates
     unpaid_delegates = [d for d in all_unpaid if not d.is_fee_exempt()]
     fee_exempt_delegates = [d for d in all_unpaid if d.is_fee_exempt()]
     
-    if not unpaid_delegates:
-        if fee_exempt_delegates:
-            flash(f'{len(fee_exempt_delegates)} delegate(s) are fee-exempt (Worship Team/Arise Band) and do not require payment.', 'info')
-        else:
-            flash('No unpaid delegates to process.', 'info')
-        return redirect(url_for('main.dashboard'))
-    
     # Calculate total based on each delegate's fee
-    total_amount = sum(d.get_registration_fee() for d in unpaid_delegates)
+    total_amount = sum(d.get_registration_fee() for d in unpaid_delegates) if unpaid_delegates else 0
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     
     form = PaymentForm()
@@ -57,6 +57,8 @@ def payment_page():
     return render_template('payments/payment.html',
         form=form,
         unpaid_delegates=unpaid_delegates,
+        pending_approval_delegates=pending_approval_delegates,
+        fee_exempt_delegates=fee_exempt_delegates,
         total_amount=total_amount,
         delegate_fee=delegate_fee,
         recent_payments=recent_payments,
