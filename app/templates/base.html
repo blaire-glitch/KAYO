@@ -963,7 +963,7 @@
                 const method = form.method.toUpperCase() || 'POST';
                 // Use getAttribute to get the actual action URL, not the form.action property
                 // (form.action can be overridden by an input named "action")
-                const action = form.getAttribute('action') || window.location.href;
+                let action = form.getAttribute('action') || window.location.href;
                 
                 // Show loading state on submit button
                 const submitBtn = form.querySelector('[type="submit"]');
@@ -973,14 +973,24 @@
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
                 }
                 
-                fetch(action, {
+                // Build fetch options - GET/HEAD cannot have body
+                const fetchOptions = {
                     method: method,
-                    body: formData,
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
                     },
                     credentials: 'same-origin'
-                })
+                };
+                
+                if (method === 'GET' || method === 'HEAD') {
+                    // Convert FormData to URL params for GET requests
+                    const params = new URLSearchParams(formData);
+                    action = action + (action.includes('?') ? '&' : '?') + params.toString();
+                } else {
+                    fetchOptions.body = formData;
+                }
+                
+                fetch(action, fetchOptions)
                 .then(response => {
                     // Handle redirects
                     if (response.redirected) {
