@@ -578,6 +578,156 @@ def check_payment_status(payment_id):
     })
 
 
+@payments_bp.route('/resend-stk/<int:payment_id>', methods=['POST'])
+@login_required
+def resend_stk(payment_id):
+    """Resend M-Pesa STK push for a pending payment"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Only allow owner to resend
+    if payment.user_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    # Only resend for pending M-Pesa payments
+    if payment.status != 'pending' or not payment.checkout_request_id:
+        return jsonify({'success': False, 'message': 'Invalid payment state'}), 400
+    
+    try:
+        # Get phone number from original payment or user
+        phone = payment.phone_number or current_user.phone
+        if not phone:
+            return jsonify({'success': False, 'message': 'No phone number available'}), 400
+        
+        # Initiate new STK push
+        mpesa = MpesaAPI()
+        response = mpesa.stk_push(
+            phone=phone,
+            amount=int(payment.amount),
+            account_reference=f"KAYO-{payment.id}",
+            transaction_desc=f"KAYO Delegate Payment"
+        )
+        
+        if response.get('ResponseCode') == '0':
+            # Update payment with new checkout request ID
+            payment.checkout_request_id = response.get('CheckoutRequestID')
+            payment.merchant_request_id = response.get('MerchantRequestID')
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'STK push sent successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': response.get('errorMessage', 'Failed to send STK push')
+            })
+    except Exception as e:
+        current_app.logger.error(f"Error resending STK: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@payments_bp.route('/cancel-and-retry/<int:payment_id>')
+@login_required
+def cancel_and_retry(payment_id):
+    """Cancel pending M-Pesa payment and switch to cash/manual payment"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Only allow owner to cancel
+    if payment.user_id != current_user.id:
+        flash('Unauthorized action.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    # Only cancel pending M-Pesa payments
+    if payment.status != 'pending':
+        flash('This payment cannot be modified.', 'warning')
+        return redirect(url_for('payments.payment_page'))
+    
+    # Get the delegates linked to this payment
+    delegates = list(payment.delegates)
+    delegate_ids = [d.id for d in delegates]
+    
+    # Unlink delegates from the failed payment
+    for delegate in delegates:
+        delegate.payment_id = None
+    
+    # Mark payment as cancelled
+    payment.status = 'failed'
+    payment.result_desc = 'Cancelled by user - switching to alternative payment method'
+    db.session.commit()
+    
+    # Store delegate IDs in session for the new payment
+    from flask import session
+    session['retry_delegate_ids'] = delegate_ids
+    
+    flash('M-Pesa payment cancelled. Please submit payment via Cash or Bank Transfer.', 'info')
+    return redirect(url_for('payments.manual_payment_form'))
+
+
+@payments_bp.route('/manual-payment', methods=['GET', 'POST'])
+@login_required
+def manual_payment_form():
+    """Manual payment form for cash/bank transfer after STK timeout"""
+    from flask import session
+    
+    # Get delegates from session or show all unpaid
+    retry_delegate_ids = session.pop('retry_delegate_ids', None)
+    
+    if retry_delegate_ids:
+        delegates = Delegate.query.filter(
+            Delegate.id.in_(retry_delegate_ids),
+            Delegate.registered_by == current_user.id
+        ).all()
+    else:
+        delegates = Delegate.query.filter(
+            Delegate.registered_by == current_user.id,
+            Delegate.is_paid == False,
+            Delegate.payment_id == None
+        ).all()
+    
+    # Filter out fee-exempt delegates
+    delegates = [d for d in delegates if not d.is_fee_exempt()]
+    
+    if not delegates:
+        flash('No unpaid delegates found.', 'info')
+        return redirect(url_for('payments.payment_page'))
+    
+    total_amount = sum(d.get_registration_fee() for d in delegates)
+    
+    if request.method == 'POST':
+        payment_method = request.form.get('payment_method', 'cash')
+        reference = request.form.get('reference', '').strip()
+        notes = request.form.get('notes', '').strip()
+        
+        # Create new payment record
+        payment = Payment(
+            user_id=current_user.id,
+            amount=total_amount,
+            delegates_count=len(delegates),
+            status='pending',
+            payment_mode=payment_method,
+            finance_status='pending_approval',
+            transaction_reference=reference,
+            notes=notes
+        )
+        db.session.add(payment)
+        db.session.flush()
+        
+        # Link delegates to payment
+        for delegate in delegates:
+            delegate.payment_id = payment.id
+        
+        db.session.commit()
+        
+        flash(f'Payment of KSh {total_amount:,.0f} submitted for {len(delegates)} delegate(s). Awaiting Finance approval.', 'success')
+        return redirect(url_for('payments.payment_status', payment_id=payment.id))
+    
+    return render_template('payments/manual_payment.html',
+        delegates=delegates,
+        total_amount=total_amount
+    )
+
+
 @payments_bp.route('/callback', methods=['POST'])
 def mpesa_callback():
     """M-Pesa callback endpoint"""
