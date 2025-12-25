@@ -764,6 +764,92 @@ def api_stats():
     })
 
 
+# ==================== DATABASE RESET / INITIALIZATION ====================
+
+@admin_bp.route('/reset-database', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def reset_database():
+    """Reset database by deleting all delegates and payments - Super Admin only"""
+    # Only super_admin can access this
+    if current_user.role != 'super_admin':
+        flash('Only Super Admin can reset the database.', 'danger')
+        return redirect(url_for('admin.dashboard'))
+    
+    if request.method == 'POST':
+        confirmation = request.form.get('confirmation', '')
+        delete_payments = request.form.get('delete_payments') == 'yes'
+        delete_delegates = request.form.get('delete_delegates') == 'yes'
+        
+        # Require typing "RESET" to confirm
+        if confirmation != 'RESET':
+            flash('Please type "RESET" to confirm the operation.', 'warning')
+            return redirect(url_for('admin.reset_database'))
+        
+        try:
+            deleted_checkins = 0
+            deleted_delegates = 0
+            deleted_payments = 0
+            
+            # Delete check-in records first (foreign key constraint)
+            if delete_delegates:
+                deleted_checkins = CheckInRecord.query.delete()
+                current_app.logger.info(f'Deleted {deleted_checkins} check-in records')
+            
+            # Delete delegates
+            if delete_delegates:
+                # First unlink all delegates from payments
+                Delegate.query.update({'payment_id': None})
+                db.session.flush()
+                
+                deleted_delegates = Delegate.query.delete()
+                current_app.logger.info(f'Deleted {deleted_delegates} delegates')
+            
+            # Delete payments
+            if delete_payments:
+                deleted_payments = Payment.query.delete()
+                current_app.logger.info(f'Deleted {deleted_payments} payments')
+            
+            db.session.commit()
+            
+            # Build success message
+            messages = []
+            if deleted_delegates > 0:
+                messages.append(f'{deleted_delegates} delegates')
+            if deleted_payments > 0:
+                messages.append(f'{deleted_payments} payments')
+            if deleted_checkins > 0:
+                messages.append(f'{deleted_checkins} check-in records')
+            
+            if messages:
+                flash(f'Database reset successful! Deleted: {", ".join(messages)}.', 'success')
+            else:
+                flash('No data was selected for deletion.', 'info')
+            
+            return redirect(url_for('admin.dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'Error resetting database: {str(e)}')
+            import traceback
+            current_app.logger.error(traceback.format_exc())
+            flash(f'Error resetting database: {str(e)}', 'danger')
+            return redirect(url_for('admin.reset_database'))
+    
+    # GET request - show confirmation page
+    total_delegates = Delegate.query.count()
+    total_payments = Payment.query.count()
+    total_checkins = CheckInRecord.query.count()
+    total_collected = Payment.get_total_collected() or 0
+    
+    return render_template('admin/reset_database.html',
+        total_delegates=total_delegates,
+        total_payments=total_payments,
+        total_checkins=total_checkins,
+        total_collected=total_collected
+    )
+
+
 @admin_bp.route('/pending-approvals')
 @login_required
 @admin_required

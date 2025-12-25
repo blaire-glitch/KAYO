@@ -118,6 +118,9 @@
                                     <th>Amount</th>
                                     <th>Method</th>
                                     <th>Status</th>
+                                    {% if current_user.role in ['admin', 'super_admin', 'finance'] %}
+                                    <th>Actions</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -149,6 +152,19 @@
                                             Awaiting Finance Approval
                                         </span>
                                     </td>
+                                    {% if current_user.role in ['admin', 'super_admin', 'finance'] %}
+                                    <td>
+                                        <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" 
+                                              method="POST" class="d-inline" 
+                                              onsubmit="return confirm('Delete this payment?\n\nAmount: KES {{ '{:,.2f}'.format(payment.amount) }}\nDelegates: {{ payment.delegates.count() }}\n\nThis will unlink all delegates from this payment.');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="redirect_url" value="{{ url_for('payments.my_submissions') }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Payment">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -179,7 +195,10 @@
                                     <th>Approved</th>
                                     <th>Delegates</th>
                                     <th>Amount</th>
-                                    <th>Notes</th>
+                                    <th>Status</th>
+                                    {% if current_user.role in ['admin', 'super_admin', 'finance'] %}
+                                    <th>Actions</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -204,6 +223,19 @@
                                         <br><small>{{ payment.finance_notes }}</small>
                                         {% endif %}
                                     </td>
+                                    {% if current_user.role in ['admin', 'super_admin', 'finance'] %}
+                                    <td>
+                                        <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" 
+                                              method="POST" class="d-inline" 
+                                              onsubmit="return confirm('Delete this approved payment?\n\nAmount: KES {{ '{:,.2f}'.format(payment.amount) }}\nDelegates: {{ payment.delegates.count() }}\n\nWARNING: This will mark all linked delegates as UNPAID!');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="redirect_url" value="{{ url_for('payments.my_submissions') }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Payment">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -249,7 +281,19 @@
                                         </span>
                                     </td>
                                     <td>
+                                        {% if current_user.role in ['admin', 'super_admin', 'finance'] %}
+                                        <form action="{{ url_for('payments.delete_payment', payment_id=payment.id) }}" 
+                                              method="POST" class="d-inline" 
+                                              onsubmit="return confirm('Delete this rejected payment?\n\nAmount: KES {{ '{:,.2f}'.format(payment.amount) }}');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="redirect_url" value="{{ url_for('payments.my_submissions') }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Payment">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% else %}
                                         <small class="text-muted">Contact finance for clarification</small>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}

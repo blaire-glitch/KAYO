@@ -400,6 +400,33 @@
         </div>
     </div>
 </div>
+
+{% if current_user.role == 'super_admin' %}
+<!-- Super Admin Danger Zone -->
+<div class="card border-danger mt-4 mb-4">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Danger Zone - Super Admin Only</h5>
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h6 class="text-danger"><i class="bi bi-database-x me-2"></i>Reset Database</h6>
+                <p class="text-muted mb-0">
+                    Delete all registered delegates and payments to start fresh. 
+                    This is useful for testing or starting a new event.
+                    <strong class="text-danger">This action cannot be undone!</strong>
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <a href="{{ url_for('admin.reset_database') }}" class="btn btn-outline-danger">
+                    <i class="bi bi-trash me-1"></i>Reset Database
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+</div>
 {% endblock %}
 
 {% block extra_js %}

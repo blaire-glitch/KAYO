@@ -687,11 +687,38 @@ def delete_payment(payment_id):
         flash('Cannot delete completed payments. Contact admin.', 'error')
         return redirect(url_for('payments.payment_history'))
     
-    db.session.delete(payment)
-    db.session.commit()
-    
-    flash('Payment record deleted.', 'success')
-    return redirect(url_for('payments.payment_history'))
+    try:
+        # Get the redirect URL before deletion
+        redirect_url = request.form.get('redirect_url', url_for('payments.payment_history'))
+        
+        # Unlink all delegates from this payment and reset their payment status
+        delegates_unlinked = 0
+        for delegate in payment.delegates.all():
+            delegate.payment_id = None
+            delegate.is_paid = False
+            delegate.amount_paid = 0
+            delegate.payment_confirmed_by = None
+            delegate.payment_confirmed_at = None
+            delegates_unlinked += 1
+        
+        payment_amount = payment.amount
+        payment_mode = payment.payment_mode
+        
+        db.session.delete(payment)
+        db.session.commit()
+        
+        if delegates_unlinked > 0:
+            flash(f'Payment of KES {payment_amount:,.2f} ({payment_mode}) deleted. {delegates_unlinked} delegate(s) unlinked and marked as unpaid.', 'success')
+        else:
+            flash('Payment record deleted.', 'success')
+        
+        return redirect(redirect_url)
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error deleting payment {payment_id}: {str(e)}')
+        flash(f'Error deleting payment: {str(e)}', 'danger')
+        return redirect(url_for('payments.payment_history'))
 
 
 # ==================== CHAIR SUBMITTED PAYMENTS ====================
