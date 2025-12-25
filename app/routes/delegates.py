@@ -294,3 +294,74 @@ def download_template():
         mimetype='text/csv',
         headers={'Content-Disposition': 'attachment; filename=delegate_template.csv'}
     )
+
+
+@delegates_bp.route('/export')
+@login_required
+def export_delegates():
+    """Export delegates to Excel/CSV format"""
+    from app.models.event import Event
+    
+    # Get filter parameters
+    status = request.args.get('status', 'all')
+    event_id = request.args.get('event_id')
+    format_type = request.args.get('format', 'csv')
+    
+    # Build query based on user role
+    if current_user.is_admin():
+        query = Delegate.query
+    else:
+        query = Delegate.query.filter_by(registered_by=current_user.id)
+    
+    # Apply filters
+    if status != 'all':
+        query = query.filter_by(registration_status=status)
+    if event_id:
+        query = query.filter_by(event_id=event_id)
+    
+    delegates = query.order_by(Delegate.created_at.desc()).all()
+    
+    # Create CSV output
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header row
+    writer.writerow([
+        'ID', 'Full Name', 'Phone', 'Email', 'ID Number', 'Gender', 'Age Bracket',
+        'Category', 'Local Church', 'Parish', 'Archdeaconry',
+        'Registration Status', 'Payment Status', 'Amount Paid',
+        'Checked In', 'Registered By', 'Registration Date'
+    ])
+    
+    # Data rows
+    for d in delegates:
+        registered_by = User.query.get(d.registered_by)
+        writer.writerow([
+            d.id,
+            d.full_name,
+            d.phone or '',
+            d.email or '',
+            d.id_number or '',
+            d.gender or '',
+            d.age_bracket or '',
+            d.category or '',
+            d.local_church or '',
+            d.parish or '',
+            d.archdeaconry or '',
+            d.registration_status,
+            d.payment_status,
+            d.amount_paid or 0,
+            'Yes' if d.checked_in else 'No',
+            registered_by.name if registered_by else '',
+            d.created_at.strftime('%Y-%m-%d %H:%M') if d.created_at else ''
+        ])
+    
+    output.seek(0)
+    
+    filename = f'delegates_export_{datetime.now().strftime("%Y%m%d_%H%M")}.csv'
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )

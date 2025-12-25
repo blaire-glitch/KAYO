@@ -14,6 +14,9 @@
             <a href="{{ url_for('payments.receive_payment') }}" class="btn btn-success">
                 <i class="bi bi-cash-coin me-1"></i>Receive Payment
             </a>
+            <a href="{{ url_for('payments.export_payments') }}" class="btn btn-outline-success" title="Export to Excel">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export
+            </a>
             <a href="{{ url_for('payments.all_payments') }}" class="btn btn-outline-primary">
                 <i class="bi bi-list-ul me-1"></i>All Payments
             </a>
