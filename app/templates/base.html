@@ -137,6 +137,12 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
         
+        /* Prevent table buttons from having hover transform that causes shaking */
+        .table .btn:hover,
+        .btn-group .btn:hover {
+            transform: none !important;
+        }
+        
         .card-header {
             background: linear-gradient(135deg, var(--kayo-green) 0%, var(--kayo-green-light) 100%);
             color: white;
