@@ -355,6 +355,103 @@
     {% endif %}
 </div>
 
+<!-- Event Countdown -->
+{% if active_event %}
+<div class="card border-0 shadow-sm mb-4 overflow-hidden" id="countdownCard">
+    <div class="card-body p-0">
+        <div class="row g-0">
+            <div class="col-md-8 p-4 bg-gradient" style="background: linear-gradient(135deg, var(--kayo-green) 0%, var(--kayo-green-dark) 100%);">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="countdown-icon bg-white bg-opacity-25 rounded-circle p-3">
+                        <i class="bi bi-calendar-event text-white" style="font-size: 2rem;"></i>
+                    </div>
+                    <div class="text-white">
+                        <h5 class="mb-1 fw-bold">{{ active_event.name }}</h5>
+                        <p class="mb-0 opacity-75">
+                            <i class="bi bi-geo-alt me-1"></i>{{ active_event.venue or 'Venue TBA' }}
+                            <span class="mx-2">•</span>
+                            <i class="bi bi-calendar3 me-1"></i>{{ active_event.start_date.strftime('%d %B %Y') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 p-3 d-flex align-items-center justify-content-center" style="background: rgba(26, 95, 42, 0.1);">
+                <div class="countdown-timer text-center" id="eventCountdown" data-target="{{ active_event.start_date.isoformat() }}">
+                    <div class="d-flex gap-3 justify-content-center">
+                        <div class="countdown-item">
+                            <div class="countdown-value fw-bold text-success" id="countdownDays">--</div>
+                            <div class="countdown-label small text-muted">Days</div>
+                        </div>
+                        <div class="countdown-item">
+                            <div class="countdown-value fw-bold text-success" id="countdownHours">--</div>
+                            <div class="countdown-label small text-muted">Hours</div>
+                        </div>
+                        <div class="countdown-item">
+                            <div class="countdown-value fw-bold text-success" id="countdownMins">--</div>
+                            <div class="countdown-label small text-muted">Mins</div>
+                        </div>
+                        <div class="countdown-item">
+                            <div class="countdown-value fw-bold text-success" id="countdownSecs">--</div>
+                            <div class="countdown-label small text-muted">Secs</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .countdown-value {
+        font-size: 1.75rem;
+        line-height: 1;
+        font-family: 'Poppins', monospace;
+    }
+    .countdown-item {
+        min-width: 50px;
+    }
+    @media (max-width: 768px) {
+        .countdown-value { font-size: 1.25rem; }
+        .countdown-item { min-width: 40px; }
+    }
+</style>
+
+<script>
+(function() {
+    const countdownEl = document.getElementById('eventCountdown');
+    if (!countdownEl) return;
+    
+    const targetDate = new Date(countdownEl.dataset.target + 'T00:00:00');
+    
+    function updateCountdown() {
+        const now = new Date();
+        const diff = targetDate - now;
+        
+        if (diff <= 0) {
+            document.getElementById('countdownDays').textContent = '🎉';
+            document.getElementById('countdownHours').textContent = 'Event';
+            document.getElementById('countdownMins').textContent = 'Is';
+            document.getElementById('countdownSecs').textContent = 'Here!';
+            return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        document.getElementById('countdownDays').textContent = days.toString().padStart(2, '0');
+        document.getElementById('countdownHours').textContent = hours.toString().padStart(2, '0');
+        document.getElementById('countdownMins').textContent = mins.toString().padStart(2, '0');
+        document.getElementById('countdownSecs').textContent = secs.toString().padStart(2, '0');
+    }
+    
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+})();
+</script>
+{% endif %}
+
 <!-- Stats Cards -->
 <div class="row mb-4">
     <div class="col-md-{% if is_dyo %}3{% else %}4{% endif %} mb-3">
@@ -462,6 +559,77 @@
         </div>
     </div>
 </div>
+
+<!-- Archdeaconry Leaderboard (Gamified) -->
+{% if archdeaconry_stats %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-trophy me-2 text-warning"></i>Archdeaconry Leaderboard
+        </h5>
+        <span class="badge bg-success">{{ archdeaconry_stats|length }} Competing</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="leaderboard">
+            {% for stat in archdeaconry_stats|sort(attribute='total', reverse=true)[:5] %}
+            {% set pct = (stat.paid / stat.total * 100) if stat.total > 0 else 0 %}
+            {% set rank = loop.index %}
+            <div class="leaderboard-item d-flex align-items-center p-3 {% if not loop.last %}border-bottom{% endif %}">
+                <!-- Rank Badge -->
+                <div class="rank-badge me-3 text-center" style="width: 45px;">
+                    {% if rank == 1 %}
+                    <span class="badge bg-warning text-dark rounded-pill px-3 py-2" style="font-size: 1rem;">🥇</span>
+                    {% elif rank == 2 %}
+                    <span class="badge bg-secondary rounded-pill px-3 py-2" style="font-size: 1rem;">🥈</span>
+                    {% elif rank == 3 %}
+                    <span class="badge bg-danger rounded-pill px-3 py-2" style="font-size: 0.9rem; opacity: 0.8;">🥉</span>
+                    {% else %}
+                    <span class="badge bg-light text-dark rounded-pill px-3 py-2">{{ rank }}</span>
+                    {% endif %}
+                </div>
+                
+                <!-- Archdeaconry Info -->
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong class="{% if rank == 1 %}text-warning{% endif %}">{{ stat.archdeaconry or 'Unknown' }}</strong>
+                        <span class="badge bg-{{ 'success' if pct >= 80 else 'primary' if pct >= 50 else 'warning' }}">
+                            {{ stat.total }} delegates
+                        </span>
+                    </div>
+                    <!-- Progress Bar -->
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%;" 
+                                 aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <small class="text-muted" style="min-width: 65px;">
+                            <span class="text-success fw-bold">{{ stat.paid }}</span>/{{ stat.total }} paid
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="card-footer bg-transparent text-center">
+        <small class="text-muted">
+            <i class="bi bi-info-circle me-1"></i>Ranked by total registrations. Green bar shows payment progress.
+        </small>
+    </div>
+</div>
+
+<style>
+    .leaderboard-item {
+        transition: background-color 0.2s;
+    }
+    .leaderboard-item:hover {
+        background-color: rgba(26, 95, 42, 0.05);
+    }
+    .leaderboard-item:first-child {
+        background: linear-gradient(90deg, rgba(255, 193, 7, 0.1) 0%, transparent 100%);
+    }
+</style>
+{% endif %}
 
 <!-- DYO Charts Row -->
 <div class="row mb-4">

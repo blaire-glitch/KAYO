@@ -59,6 +59,11 @@ def app_home():
 @main_bp.route('/dashboard')
 @login_required
 def dashboard():
+    from app.models.event import Event
+    
+    # Get active event for countdown
+    active_event = Event.query.filter_by(is_active=True).first()
+    
     if current_user.is_admin():
         return redirect(url_for('admin.dashboard'))
     
@@ -127,7 +132,8 @@ def dashboard():
             daily_stats=daily_stats,
             total_users=total_users,
             payments=payments,
-            is_dyo=True
+            is_dyo=True,
+            active_event=active_event
         )
     
     # Regular users see only their own delegates
@@ -154,5 +160,6 @@ def dashboard():
         unpaid_delegates=unpaid_delegates,
         pending_approval=pending_approval,
         payments=payments,
-        is_dyo=False
+        is_dyo=False,
+        active_event=active_event
     )
