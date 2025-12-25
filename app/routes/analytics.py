@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from functools import wraps
 from app.utils.analytics import Analytics
@@ -21,25 +21,53 @@ def admin_required(f):
 @admin_required
 def dashboard():
     """Main analytics dashboard"""
-    event_id = request.args.get('event_id', type=int) or (
-        current_user.current_event_id if current_user.current_event_id else None
-    )
-    
-    # Get all analytics data
-    forecast = Analytics.get_revenue_forecast(event_id, days_ahead=30)
-    regions = Analytics.get_regional_performance(event_id)
-    demographics = Analytics.get_demographic_insights(event_id)
-    payment_behavior = Analytics.get_payment_behavior(event_id)
-    registration_trend = Analytics.get_registration_trend(event_id, days=30)
-    
-    return render_template('analytics/dashboard.html',
-        forecast=forecast,
-        regions=regions,
-        demographics=demographics,
-        payment_behavior=payment_behavior,
-        registration_trend=registration_trend,
-        event_id=event_id
-    )
+    try:
+        event_id = request.args.get('event_id', type=int) or (
+            current_user.current_event_id if current_user.current_event_id else None
+        )
+        
+        # Get all analytics data with error handling
+        try:
+            forecast = Analytics.get_revenue_forecast(event_id, days_ahead=30)
+        except Exception as e:
+            print(f"Analytics forecast error: {e}")
+            forecast = {'error': str(e)}
+        
+        try:
+            regions = Analytics.get_regional_performance(event_id)
+        except Exception as e:
+            print(f"Analytics regions error: {e}")
+            regions = []
+        
+        try:
+            demographics = Analytics.get_demographic_insights(event_id)
+        except Exception as e:
+            print(f"Analytics demographics error: {e}")
+            demographics = {}
+        
+        try:
+            payment_behavior = Analytics.get_payment_behavior(event_id)
+        except Exception as e:
+            print(f"Analytics payment_behavior error: {e}")
+            payment_behavior = {}
+        
+        try:
+            registration_trend = Analytics.get_registration_trend(event_id, days=30)
+        except Exception as e:
+            print(f"Analytics registration_trend error: {e}")
+            registration_trend = []
+        
+        return render_template('analytics/dashboard.html',
+            forecast=forecast,
+            regions=regions,
+            demographics=demographics,
+            payment_behavior=payment_behavior,
+            registration_trend=registration_trend,
+            event_id=event_id
+        )
+    except Exception as e:
+        flash(f'Error loading analytics: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
 
 
 @analytics_bp.route('/api/forecast')
