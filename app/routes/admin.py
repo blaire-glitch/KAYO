@@ -930,60 +930,64 @@ def reject_user(user_id):
 @admin_required
 def audit_log():
     """View system audit log"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 50
-    
-    # Filter parameters
-    action = request.args.get('action', '')
-    resource_type = request.args.get('resource_type', '')
-    user_id = request.args.get('user_id', '', type=int)
-    date_from = request.args.get('date_from', '')
-    date_to = request.args.get('date_to', '')
-    
-    # Build query
-    query = AuditLog.query
-    
-    if action:
-        query = query.filter(AuditLog.action == action)
-    if resource_type:
-        query = query.filter(AuditLog.resource_type == resource_type)
-    if user_id:
-        query = query.filter(AuditLog.user_id == user_id)
-    if date_from:
-        try:
-            date_from_dt = datetime.strptime(date_from, '%Y-%m-%d')
-            query = query.filter(AuditLog.created_at >= date_from_dt)
-        except:
-            pass
-    if date_to:
-        try:
-            date_to_dt = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
-            query = query.filter(AuditLog.created_at < date_to_dt)
-        except:
-            pass
-    
-    logs = query.order_by(AuditLog.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    
-    # Get unique values for filters
-    actions = db.session.query(AuditLog.action).distinct().all()
-    resource_types = db.session.query(AuditLog.resource_type).distinct().all()
-    users = User.query.all()
-    
-    return render_template('admin/audit_log.html',
-        logs=logs,
-        actions=[a[0] for a in actions if a[0]],
-        resource_types=[r[0] for r in resource_types if r[0]],
-        users=users,
-        filters={
-            'action': action,
-            'resource_type': resource_type,
-            'user_id': user_id,
-            'date_from': date_from,
-            'date_to': date_to
-        }
-    )
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        
+        # Filter parameters
+        action = request.args.get('action', '')
+        resource_type = request.args.get('resource_type', '')
+        user_id = request.args.get('user_id', 0, type=int)
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        
+        # Build query
+        query = AuditLog.query
+        
+        if action:
+            query = query.filter(AuditLog.action == action)
+        if resource_type:
+            query = query.filter(AuditLog.resource_type == resource_type)
+        if user_id:
+            query = query.filter(AuditLog.user_id == user_id)
+        if date_from:
+            try:
+                date_from_dt = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(AuditLog.created_at >= date_from_dt)
+            except:
+                pass
+        if date_to:
+            try:
+                date_to_dt = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(AuditLog.created_at < date_to_dt)
+            except:
+                pass
+        
+        logs = query.order_by(AuditLog.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        # Get unique values for filters
+        actions = db.session.query(AuditLog.action).distinct().all()
+        resource_types = db.session.query(AuditLog.resource_type).distinct().all()
+        users = User.query.all()
+        
+        return render_template('admin/audit_log.html',
+            logs=logs,
+            actions=[a[0] for a in actions if a[0]],
+            resource_types=[r[0] for r in resource_types if r[0]],
+            users=users,
+            filters={
+                'action': action,
+                'resource_type': resource_type,
+                'user_id': user_id,
+                'date_from': date_from,
+                'date_to': date_to
+            }
+        )
+    except Exception as e:
+        flash(f'Error loading audit log: {str(e)}', 'error')
+        return redirect(url_for('admin.dashboard'))
 
 
 @admin_bp.route('/charts')

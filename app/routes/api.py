@@ -249,99 +249,120 @@ def get_church_data():
 @login_required
 def get_notifications():
     """Get notifications for current user"""
-    from app.models.delegate import Delegate
-    from app.models.payment import Payment
-    from app.models.user import User
-    from datetime import datetime, timedelta
-    
-    notifications = []
-    
-    # For admin/super_admin: pending user approvals
-    if current_user.role in ['admin', 'super_admin']:
-        pending_users = User.query.filter_by(is_approved=False).count()
-        if pending_users > 0:
-            notifications.append({
-                'id': 'pending_users',
-                'type': 'warning',
-                'icon': 'bi-person-exclamation',
-                'title': f'{pending_users} User(s) Pending Approval',
-                'message': 'New registrations awaiting your review',
-                'url': '/admin/pending-approvals',
-                'time': 'Action needed'
-            })
-    
-    # For admin/finance: pending payment approvals
-    if current_user.role in ['admin', 'super_admin', 'finance']:
-        pending_payments = Payment.query.filter_by(status='pending').count()
-        if pending_payments > 0:
-            notifications.append({
-                'id': 'pending_payments',
-                'type': 'info',
-                'icon': 'bi-cash-coin',
-                'title': f'{pending_payments} Payment(s) Pending',
-                'message': 'Payments awaiting verification',
-                'url': '/finance/',
-                'time': 'Action needed'
-            })
-    
-    # For all users: unpaid delegates reminder
-    if current_user.role not in ['viewer']:
+    try:
+        from app.models.delegate import Delegate
+        from app.models.payment import Payment
+        from app.models.user import User
+        from datetime import datetime, timedelta
+        
+        notifications = []
+        
+        # For admin/super_admin: pending user approvals
         if current_user.role in ['admin', 'super_admin']:
-            unpaid = Delegate.query.filter_by(is_paid=False).count()
-        else:
-            unpaid = Delegate.query.filter_by(registered_by=current_user.id, is_paid=False).count()
+            try:
+                pending_users = User.query.filter_by(is_approved=False).count()
+                if pending_users > 0:
+                    notifications.append({
+                        'id': 'pending_users',
+                        'type': 'warning',
+                        'icon': 'bi-person-exclamation',
+                        'title': f'{pending_users} User(s) Pending Approval',
+                        'message': 'New registrations awaiting your review',
+                        'url': '/admin/pending-approvals',
+                        'time': 'Action needed'
+                    })
+            except:
+                pass
         
-        if unpaid > 0:
-            notifications.append({
-                'id': 'unpaid_delegates',
-                'type': 'warning',
-                'icon': 'bi-exclamation-triangle',
-                'title': f'{unpaid} Unpaid Delegate(s)',
-                'message': 'Complete payment to confirm registration',
-                'url': '/payments',
-                'time': 'Reminder'
-            })
-    
-    # Recent successful payments (last 24h) - for chair users
-    if current_user.role not in ['admin', 'super_admin', 'finance', 'viewer']:
-        recent_payments = Payment.query.filter(
-            Payment.user_id == current_user.id,
-            Payment.status == 'completed',
-            Payment.payment_date >= datetime.utcnow() - timedelta(hours=24)
-        ).count()
+        # For admin/finance: pending payment approvals
+        if current_user.role in ['admin', 'super_admin', 'finance']:
+            try:
+                pending_payments = Payment.query.filter_by(status='pending').count()
+                if pending_payments > 0:
+                    notifications.append({
+                        'id': 'pending_payments',
+                        'type': 'info',
+                        'icon': 'bi-cash-coin',
+                        'title': f'{pending_payments} Payment(s) Pending',
+                        'message': 'Payments awaiting verification',
+                        'url': '/finance/',
+                        'time': 'Action needed'
+                    })
+            except:
+                pass
         
-        if recent_payments > 0:
-            notifications.append({
-                'id': 'recent_payments',
-                'type': 'success',
-                'icon': 'bi-check-circle',
-                'title': f'{recent_payments} Payment(s) Approved',
-                'message': 'Your recent payments have been confirmed',
-                'url': '/payments/history',
-                'time': 'Last 24h'
-            })
-    
-    # Admin: recent registrations
-    if current_user.role in ['admin', 'super_admin', 'viewer']:
-        today_registrations = Delegate.query.filter(
-            Delegate.created_at >= datetime.utcnow() - timedelta(hours=24)
-        ).count()
+        # For all users: unpaid delegates reminder
+        if current_user.role not in ['viewer']:
+            try:
+                if current_user.role in ['admin', 'super_admin']:
+                    unpaid = Delegate.query.filter_by(is_paid=False).count()
+                else:
+                    unpaid = Delegate.query.filter_by(registered_by=current_user.id, is_paid=False).count()
+                
+                if unpaid > 0:
+                    notifications.append({
+                        'id': 'unpaid_delegates',
+                        'type': 'warning',
+                        'icon': 'bi-exclamation-triangle',
+                        'title': f'{unpaid} Unpaid Delegate(s)',
+                        'message': 'Complete payment to confirm registration',
+                        'url': '/payments',
+                        'time': 'Reminder'
+                    })
+            except:
+                pass
         
-        if today_registrations > 0:
-            notifications.append({
-                'id': 'today_registrations',
-                'type': 'success',
-                'icon': 'bi-person-plus',
-                'title': f'{today_registrations} New Registration(s)',
-                'message': 'Delegates registered in the last 24 hours',
-                'url': '/delegates',
-                'time': 'Last 24h'
-            })
-    
-    return jsonify({
-        'notifications': notifications,
-        'unread_count': len([n for n in notifications if n['type'] in ['warning', 'info']])
-    })
+        # Recent successful payments (last 24h) - for chair users
+        if current_user.role not in ['admin', 'super_admin', 'finance', 'viewer']:
+            try:
+                recent_payments = Payment.query.filter(
+                    Payment.user_id == current_user.id,
+                    Payment.status == 'completed',
+                    Payment.payment_date >= datetime.utcnow() - timedelta(hours=24)
+                ).count()
+                
+                if recent_payments > 0:
+                    notifications.append({
+                        'id': 'recent_payments',
+                        'type': 'success',
+                        'icon': 'bi-check-circle',
+                        'title': f'{recent_payments} Payment(s) Approved',
+                        'message': 'Your recent payments have been confirmed',
+                        'url': '/payments/history',
+                        'time': 'Last 24h'
+                    })
+            except:
+                pass
+        
+        # Admin: recent registrations
+        if current_user.role in ['admin', 'super_admin', 'viewer']:
+            try:
+                today_registrations = Delegate.query.filter(
+                    Delegate.registered_at >= datetime.utcnow() - timedelta(hours=24)
+                ).count()
+                
+                if today_registrations > 0:
+                    notifications.append({
+                        'id': 'today_registrations',
+                        'type': 'success',
+                        'icon': 'bi-person-plus',
+                        'title': f'{today_registrations} New Registration(s)',
+                        'message': 'Delegates registered in the last 24 hours',
+                        'url': '/delegates',
+                        'time': 'Last 24h'
+                    })
+            except:
+                pass
+        
+        return jsonify({
+            'notifications': notifications,
+            'unread_count': len([n for n in notifications if n['type'] in ['warning', 'info']])
+        })
+    except Exception as e:
+        return jsonify({
+            'notifications': [],
+            'unread_count': 0
+        })
 
 
 @api_bp.route('/check-duplicate')
