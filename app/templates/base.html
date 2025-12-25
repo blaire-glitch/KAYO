@@ -1454,5 +1454,200 @@
             </div>
         </div>
     </footer>
+    
+    {% if current_user.is_authenticated %}
+    <!-- Quick Actions FAB -->
+    <div class="quick-actions-fab">
+        <div class="fab-menu" id="fabMenu">
+            {% if current_user.is_admin() %}
+            <a href="{{ url_for('delegates.register_delegate') }}" class="fab-item" title="Register Delegate">
+                <i class="bi bi-person-plus"></i>
+                <span>Register Delegate</span>
+            </a>
+            <a href="{{ url_for('payments.receive_payment') }}" class="fab-item" title="Receive Payment">
+                <i class="bi bi-cash-coin"></i>
+                <span>Receive Payment</span>
+            </a>
+            <a href="{{ url_for('events.create_event') }}" class="fab-item" title="Create Event">
+                <i class="bi bi-calendar-plus"></i>
+                <span>Create Event</span>
+            </a>
+            {% elif current_user.role == 'chair' %}
+            <a href="{{ url_for('delegates.register_delegate') }}" class="fab-item" title="Register Delegate">
+                <i class="bi bi-person-plus"></i>
+                <span>Register Delegate</span>
+            </a>
+            <a href="{{ url_for('payments.submit_payment') }}" class="fab-item" title="Submit Payment">
+                <i class="bi bi-credit-card"></i>
+                <span>Submit Payment</span>
+            </a>
+            {% endif %}
+            <a href="#" class="fab-item" id="scrollTopBtn" title="Back to Top">
+                <i class="bi bi-arrow-up"></i>
+                <span>Back to Top</span>
+            </a>
+        </div>
+        <button class="fab-main" id="fabToggle" title="Quick Actions">
+            <i class="bi bi-plus-lg fab-icon-default"></i>
+            <i class="bi bi-x-lg fab-icon-close"></i>
+        </button>
+    </div>
+    
+    <style>
+        /* Floating Action Button Styles */
+        .quick-actions-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1040;
+        }
+        
+        .fab-main {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--kayo-green) 0%, var(--kayo-green-dark) 100%);
+            border: none;
+            color: white;
+            box-shadow: 0 4px 20px rgba(26, 95, 42, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        
+        .fab-main:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(26, 95, 42, 0.5);
+        }
+        
+        .fab-main .fab-icon-close {
+            display: none;
+        }
+        
+        .fab-main.active .fab-icon-default {
+            display: none;
+        }
+        
+        .fab-main.active .fab-icon-close {
+            display: block;
+        }
+        
+        .fab-main.active {
+            transform: rotate(180deg);
+            background: #dc3545;
+        }
+        
+        .fab-menu {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        
+        .fab-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .fab-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            text-decoration: none;
+            color: #333;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        
+        [data-bs-theme="dark"] .fab-item {
+            background: #2d3238;
+            color: #fff;
+        }
+        
+        .fab-item:hover {
+            transform: translateX(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            color: var(--kayo-green);
+        }
+        
+        .fab-item i {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--kayo-green);
+            color: white;
+            border-radius: 50%;
+            font-size: 0.8rem;
+        }
+        
+        @media (max-width: 768px) {
+            .quick-actions-fab {
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .fab-item span {
+                display: none;
+            }
+            
+            .fab-item {
+                padding: 12px;
+                border-radius: 50%;
+            }
+            
+            .fab-item i {
+                width: 28px;
+                height: 28px;
+            }
+        }
+    </style>
+    
+    <script>
+        // FAB Toggle
+        const fabToggle = document.getElementById('fabToggle');
+        const fabMenu = document.getElementById('fabMenu');
+        const scrollTopBtn = document.getElementById('scrollTopBtn');
+        
+        if (fabToggle) {
+            fabToggle.addEventListener('click', function() {
+                this.classList.toggle('active');
+                fabMenu.classList.toggle('show');
+            });
+            
+            // Close on click outside
+            document.addEventListener('click', function(e) {
+                if (!fabToggle.contains(e.target) && !fabMenu.contains(e.target)) {
+                    fabToggle.classList.remove('active');
+                    fabMenu.classList.remove('show');
+                }
+            });
+        }
+        
+        if (scrollTopBtn) {
+            scrollTopBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                fabToggle.classList.remove('active');
+                fabMenu.classList.remove('show');
+            });
+        }
+    </script>
+    {% endif %}
 </body>
 </html>
