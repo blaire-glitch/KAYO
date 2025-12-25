@@ -19,9 +19,11 @@ PAYMENT_CONFIRMATION_ROLES = ['finance', 'treasurer', 'admin', 'super_admin', 'r
 def payment_page():
     """Show payment page with unpaid delegates"""
     # Get unpaid delegates that require payment (exclude fee-exempt categories)
-    all_unpaid = Delegate.query.filter_by(
-        registered_by=current_user.id,
-        is_paid=False
+    # Also exclude delegates already linked to a pending payment
+    all_unpaid = Delegate.query.filter(
+        Delegate.registered_by == current_user.id,
+        Delegate.is_paid == False,
+        Delegate.payment_id == None  # Not already linked to a payment
     ).all()
     
     # Separate fee-exempt and fee-required delegates
@@ -79,9 +81,11 @@ def initiate_payment():
     current_app.logger.info(f'Payment method selected: {payment_method}')
     
     # Get unpaid delegates that require payment (exclude fee-exempt)
-    all_unpaid = Delegate.query.filter_by(
-        registered_by=current_user.id,
-        is_paid=False
+    # Also exclude delegates already linked to a pending payment
+    all_unpaid = Delegate.query.filter(
+        Delegate.registered_by == current_user.id,
+        Delegate.is_paid == False,
+        Delegate.payment_id == None  # Not already linked to a payment
     ).all()
     
     unpaid_delegates = [d for d in all_unpaid if not d.is_fee_exempt()]
@@ -363,12 +367,13 @@ def confirm_cash_payment():
     form = CashPaymentForm()
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     
-    # Get all unpaid delegates (excluding fee-exempt)
+    # Get all unpaid delegates (excluding fee-exempt and those already linked to a pending payment)
     # For chairs, show delegates they registered OR delegates in their parish
     if current_user.role == 'chair':
         from sqlalchemy import or_
         all_unpaid = Delegate.query.filter(
             Delegate.is_paid == False,
+            Delegate.payment_id == None,  # Not already linked to a payment
             or_(
                 Delegate.registered_by == current_user.id,
                 Delegate.parish == current_user.parish
@@ -377,7 +382,10 @@ def confirm_cash_payment():
             Delegate.archdeaconry, Delegate.parish, Delegate.name
         ).all()
     else:
-        all_unpaid = Delegate.query.filter_by(is_paid=False).order_by(
+        all_unpaid = Delegate.query.filter(
+            Delegate.is_paid == False,
+            Delegate.payment_id == None  # Not already linked to a payment
+        ).order_by(
             Delegate.archdeaconry, Delegate.parish, Delegate.name
         ).all()
     unpaid_delegates = [d for d in all_unpaid if not d.is_fee_exempt()]
@@ -393,12 +401,19 @@ def confirm_cash_payment():
                 flash('Please select at least one delegate.', 'danger')
                 return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
             
-            # Get delegates
-            delegates = Delegate.query.filter(Delegate.id.in_(delegate_ids)).all()
+            # Get delegates - only those without existing payment
+            delegates = Delegate.query.filter(
+                Delegate.id.in_(delegate_ids),
+                Delegate.payment_id == None  # Verify no pending payment (race condition protection)
+            ).all()
             
             if not delegates:
-                flash('No delegates found with the provided IDs.', 'danger')
-                return render_template('payments/confirm_cash.html', form=form, unpaid_delegates=unpaid_delegates, delegate_fee=delegate_fee)
+                flash('No eligible delegates found. They may have already been submitted for payment.', 'warning')
+                return redirect(url_for('payments.confirm_cash_payment'))
+            
+            if len(delegates) < len(delegate_ids):
+                skipped = len(delegate_ids) - len(delegates)
+                flash(f'{skipped} delegate(s) skipped - already submitted for payment.', 'warning')
             
             # Calculate amount using each delegate's fee
             total_amount = sum(d.get_registration_fee() for d in delegates)
