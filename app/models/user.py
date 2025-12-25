@@ -53,7 +53,8 @@ class User(UserMixin, db.Model):
     # Relationships
     delegates = db.relationship('Delegate', backref='registered_by_user', lazy='dynamic',
                                foreign_keys='Delegate.registered_by')
-    payments = db.relationship('Payment', backref='user', lazy='dynamic')
+    payments = db.relationship('Payment', backref='user', lazy='dynamic',
+                              foreign_keys='Payment.user_id')
     assigned_role = db.relationship('Role', backref='users', foreign_keys=[role_id])
     
     def set_password(self, password):
