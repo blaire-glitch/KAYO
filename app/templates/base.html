@@ -983,6 +983,11 @@
                                 <i class="bi bi-question-circle"></i>Help & Tutorial
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'main.chair_manual' %}active{% endif %}" href="{{ url_for('main.chair_manual') }}">
+                                <i class="bi bi-book"></i>Training Manual
+                            </a>
+                        </li>
                         {% endif %}
                         {% endif %}
                     </ul>

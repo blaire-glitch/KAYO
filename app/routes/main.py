@@ -20,6 +20,13 @@ def help_page():
     return render_template('help/index.html')
 
 
+@main_bp.route('/help/chair-manual')
+@login_required
+def chair_manual():
+    """Comprehensive training manual for Parish Chairs"""
+    return render_template('help/chair_manual.html')
+
+
 @main_bp.route('/tutorial/mark-seen', methods=['POST'])
 @login_required
 def mark_tutorial_seen():
