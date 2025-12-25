@@ -226,3 +226,178 @@ def get_parishes_for_archdeaconry(archdeaconry):
 def get_church_data():
     """API endpoint to get all church data"""
     return jsonify(CHURCH_DATA)
+
+
+@api_bp.route('/notifications')
+@login_required
+def get_notifications():
+    """Get notifications for current user"""
+    from app.models.delegate import Delegate
+    from app.models.payment import Payment
+    from app.models.user import User
+    from datetime import datetime, timedelta
+    
+    notifications = []
+    
+    # For admin/super_admin: pending user approvals
+    if current_user.role in ['admin', 'super_admin']:
+        pending_users = User.query.filter_by(is_approved=False).count()
+        if pending_users > 0:
+            notifications.append({
+                'id': 'pending_users',
+                'type': 'warning',
+                'icon': 'bi-person-exclamation',
+                'title': f'{pending_users} User(s) Pending Approval',
+                'message': 'New registrations awaiting your review',
+                'url': '/admin/pending-approvals',
+                'time': 'Action needed'
+            })
+    
+    # For admin/finance: pending payment approvals
+    if current_user.role in ['admin', 'super_admin', 'finance']:
+        pending_payments = Payment.query.filter_by(status='pending').count()
+        if pending_payments > 0:
+            notifications.append({
+                'id': 'pending_payments',
+                'type': 'info',
+                'icon': 'bi-cash-coin',
+                'title': f'{pending_payments} Payment(s) Pending',
+                'message': 'Payments awaiting verification',
+                'url': '/finance/dashboard',
+                'time': 'Action needed'
+            })
+    
+    # For all users: unpaid delegates reminder
+    if current_user.role not in ['viewer']:
+        if current_user.role in ['admin', 'super_admin']:
+            unpaid = Delegate.query.filter_by(is_paid=False).count()
+        else:
+            unpaid = Delegate.query.filter_by(registered_by=current_user.id, is_paid=False).count()
+        
+        if unpaid > 0:
+            notifications.append({
+                'id': 'unpaid_delegates',
+                'type': 'warning',
+                'icon': 'bi-exclamation-triangle',
+                'title': f'{unpaid} Unpaid Delegate(s)',
+                'message': 'Complete payment to confirm registration',
+                'url': '/payments',
+                'time': 'Reminder'
+            })
+    
+    # Recent successful payments (last 24h) - for chair users
+    if current_user.role not in ['admin', 'super_admin', 'finance', 'viewer']:
+        recent_payments = Payment.query.filter(
+            Payment.user_id == current_user.id,
+            Payment.status == 'completed',
+            Payment.payment_date >= datetime.utcnow() - timedelta(hours=24)
+        ).count()
+        
+        if recent_payments > 0:
+            notifications.append({
+                'id': 'recent_payments',
+                'type': 'success',
+                'icon': 'bi-check-circle',
+                'title': f'{recent_payments} Payment(s) Approved',
+                'message': 'Your recent payments have been confirmed',
+                'url': '/payments/history',
+                'time': 'Last 24h'
+            })
+    
+    # Admin: recent registrations
+    if current_user.role in ['admin', 'super_admin', 'viewer']:
+        today_registrations = Delegate.query.filter(
+            Delegate.created_at >= datetime.utcnow() - timedelta(hours=24)
+        ).count()
+        
+        if today_registrations > 0:
+            notifications.append({
+                'id': 'today_registrations',
+                'type': 'success',
+                'icon': 'bi-person-plus',
+                'title': f'{today_registrations} New Registration(s)',
+                'message': 'Delegates registered in the last 24 hours',
+                'url': '/delegates',
+                'time': 'Last 24h'
+            })
+    
+    return jsonify({
+        'notifications': notifications,
+        'unread_count': len([n for n in notifications if n['type'] in ['warning', 'info']])
+    })
+
+
+@api_bp.route('/check-duplicate')
+@login_required
+def check_duplicate():
+    """Check for potential duplicate delegates by name or phone"""
+    from app.models.delegate import Delegate
+    from difflib import SequenceMatcher
+    
+    name = request.args.get('name', '').strip()
+    phone = request.args.get('phone', '').strip()
+    exclude_id = request.args.get('exclude_id', type=int)  # Exclude when editing
+    
+    duplicates = []
+    
+    # Check phone number (exact match)
+    if phone and len(phone) >= 9:
+        # Normalize phone number
+        normalized_phone = phone.replace(' ', '').replace('-', '')
+        if normalized_phone.startswith('0'):
+            normalized_phone = '254' + normalized_phone[1:]
+        elif normalized_phone.startswith('+'):
+            normalized_phone = normalized_phone[1:]
+        
+        phone_matches = Delegate.query.filter(
+            Delegate.phone_number.ilike(f'%{normalized_phone[-9:]}%')
+        ).all()
+        
+        for d in phone_matches:
+            if exclude_id and d.id == exclude_id:
+                continue
+            duplicates.append({
+                'id': d.id,
+                'name': d.full_name,
+                'phone': d.phone_number,
+                'parish': d.parish,
+                'match_type': 'phone',
+                'confidence': 100
+            })
+    
+    # Check name similarity (fuzzy match)
+    if name and len(name) >= 3:
+        # Get all delegates for comparison
+        all_delegates = Delegate.query.all()
+        name_lower = name.lower()
+        
+        for d in all_delegates:
+            if exclude_id and d.id == exclude_id:
+                continue
+            
+            # Skip if already matched by phone
+            if any(dup['id'] == d.id for dup in duplicates):
+                continue
+            
+            delegate_name = (d.full_name or '').lower()
+            
+            # Calculate similarity ratio
+            ratio = SequenceMatcher(None, name_lower, delegate_name).ratio()
+            
+            if ratio >= 0.8:  # 80% similarity threshold
+                duplicates.append({
+                    'id': d.id,
+                    'name': d.full_name,
+                    'phone': d.phone_number,
+                    'parish': d.parish,
+                    'match_type': 'name',
+                    'confidence': int(ratio * 100)
+                })
+    
+    # Sort by confidence
+    duplicates.sort(key=lambda x: x['confidence'], reverse=True)
+    
+    return jsonify({
+        'duplicates': duplicates[:5],  # Return top 5 matches
+        'has_duplicates': len(duplicates) > 0
+    })

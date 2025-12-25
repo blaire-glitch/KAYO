@@ -365,3 +365,143 @@ def export_delegates():
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename={filename}'}
     )
+
+
+@delegates_bp.route('/import', methods=['GET', 'POST'])
+@login_required
+def import_delegates():
+    """Batch import delegates from CSV/Excel file"""
+    if request.method == 'GET':
+        return render_template('delegates/import.html')
+    
+    if 'file' not in request.files:
+        flash('No file uploaded', 'error')
+        return redirect(url_for('delegates.import_delegates'))
+    
+    file = request.files['file']
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('delegates.import_delegates'))
+    
+    # Check file extension
+    if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
+        flash('Invalid file format. Please upload CSV or Excel file.', 'error')
+        return redirect(url_for('delegates.import_delegates'))
+    
+    try:
+        if file.filename.lower().endswith('.csv'):
+            # Parse CSV
+            content = file.read().decode('utf-8-sig')  # Handle BOM
+            reader = csv.DictReader(io.StringIO(content))
+            rows = list(reader)
+        else:
+            # Parse Excel
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(file)
+                ws = wb.active
+                headers = [cell.value for cell in ws[1]]
+                rows = []
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    row_dict = dict(zip(headers, row))
+                    rows.append(row_dict)
+            except ImportError:
+                flash('Excel support requires openpyxl. Please use CSV format.', 'error')
+                return redirect(url_for('delegates.import_delegates'))
+        
+        # Process rows
+        success_count = 0
+        error_count = 0
+        errors = []
+        
+        for idx, row in enumerate(rows, start=2):  # Start at 2 (row 1 is header)
+            try:
+                # Normalize column names (case-insensitive, strip whitespace)
+                row = {k.strip().lower() if k else '': v for k, v in row.items()}
+                
+                # Get name (required)
+                name = row.get('name') or row.get('full name') or row.get('fullname')
+                if not name or str(name).strip() == '':
+                    errors.append(f'Row {idx}: Name is required')
+                    error_count += 1
+                    continue
+                
+                # Get other fields with defaults
+                delegate = Delegate(
+                    ticket_number=Delegate.generate_ticket_number(),
+                    name=str(name).strip(),
+                    phone_number=str(row.get('phone') or row.get('phone number') or row.get('phone_number') or '').strip() or None,
+                    id_number=str(row.get('id number') or row.get('id_number') or row.get('id') or '').strip() or None,
+                    gender=str(row.get('gender') or '').strip().lower() or 'male',
+                    age_bracket=str(row.get('age bracket') or row.get('age_bracket') or row.get('age') or '20_24').strip(),
+                    category=str(row.get('category') or 'delegate').strip().lower(),
+                    local_church=str(row.get('local church') or row.get('local_church') or row.get('church') or current_user.local_church or '').strip(),
+                    parish=str(row.get('parish') or current_user.parish or '').strip(),
+                    archdeaconry=str(row.get('archdeaconry') or current_user.archdeaconry or '').strip(),
+                    registered_by=current_user.id
+                )
+                
+                # Auto-mark fee-exempt categories as paid
+                if delegate.is_fee_exempt():
+                    delegate.is_paid = True
+                    delegate.amount_paid = 0
+                    delegate.payment_confirmed_by = current_user.id
+                    delegate.payment_confirmed_at = datetime.utcnow()
+                
+                db.session.add(delegate)
+                success_count += 1
+                
+            except Exception as e:
+                errors.append(f'Row {idx}: {str(e)}')
+                error_count += 1
+        
+        db.session.commit()
+        
+        if success_count > 0:
+            flash(f'Successfully imported {success_count} delegate(s)!', 'success')
+        if error_count > 0:
+            flash(f'Failed to import {error_count} row(s). See details below.', 'warning')
+            for error in errors[:5]:  # Show first 5 errors
+                flash(error, 'error')
+        
+        return redirect(url_for('delegates.list_delegates'))
+        
+    except Exception as e:
+        flash(f'Error processing file: {str(e)}', 'error')
+        return redirect(url_for('delegates.import_delegates'))
+
+
+@delegates_bp.route('/import/template')
+@login_required
+def download_import_template():
+    """Download a CSV template for batch import"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header row
+    writer.writerow([
+        'name', 'phone', 'gender', 'age bracket', 'category',
+        'local church', 'parish', 'archdeaconry'
+    ])
+    
+    # Sample rows
+    writer.writerow([
+        'John Doe', '0712345678', 'male', '20_24', 'delegate',
+        'St. Paul Church', 'Nambale Parish', 'Nambale Archdeaconry'
+    ])
+    writer.writerow([
+        'Jane Smith', '0723456789', 'female', '15_19', 'leader',
+        '', '', ''  # Will use user's default church
+    ])
+    writer.writerow([
+        'Mary Johnson', '', 'female', '25_29', 'counsellor',
+        '', '', ''
+    ])
+    
+    output.seek(0)
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=delegates_import_template.csv'}
+    )

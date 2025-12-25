@@ -613,6 +613,29 @@
                         </button>
                     </li>
                     {% if current_user.is_authenticated %}
+                    <!-- Notification Bell -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                            <i class="bi bi-bell"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge" id="notificationBadge" style="display: none; font-size: 0.6rem;">
+                                0
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="width: 320px; max-height: 400px; overflow-y: auto;" aria-labelledby="notificationDropdown">
+                            <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                <strong><i class="bi bi-bell me-1"></i>Notifications</strong>
+                                <button class="btn btn-sm btn-link text-muted p-0" onclick="markAllRead()" title="Mark all read">
+                                    <i class="bi bi-check-all"></i>
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <div id="notificationList">
+                                <li class="text-center py-3 text-muted small">
+                                    <i class="bi bi-bell-slash me-1"></i>Loading...
+                                </li>
+                            </div>
+                        </ul>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                             <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
@@ -1105,6 +1128,72 @@
                     searchInput.select();
                 }
             });
+        })();
+        
+        // Notification Center
+        (function() {
+            const notificationList = document.getElementById('notificationList');
+            const notificationBadge = document.getElementById('notificationBadge');
+            
+            if (!notificationList) return;
+            
+            async function loadNotifications() {
+                try {
+                    const response = await fetch('/api/notifications');
+                    const data = await response.json();
+                    
+                    if (data.notifications.length === 0) {
+                        notificationList.innerHTML = `
+                            <li class="text-center py-3 text-muted small">
+                                <i class="bi bi-bell-slash me-1"></i>No notifications
+                            </li>
+                        `;
+                        notificationBadge.style.display = 'none';
+                    } else {
+                        notificationList.innerHTML = data.notifications.map(n => `
+                            <li>
+                                <a class="dropdown-item py-2" href="${n.url}">
+                                    <div class="d-flex align-items-start">
+                                        <div class="notification-icon me-2 rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 36px; height: 36px; background: ${n.type === 'warning' ? 'rgba(255,193,7,0.15)' : n.type === 'success' ? 'rgba(25,135,84,0.15)' : 'rgba(13,110,253,0.15)'}">
+                                            <i class="bi ${n.icon} text-${n.type === 'warning' ? 'warning' : n.type === 'success' ? 'success' : 'primary'}"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-medium small">${n.title}</div>
+                                            <div class="text-muted" style="font-size: 0.75rem;">${n.message}</div>
+                                            <div class="text-muted" style="font-size: 0.7rem;">${n.time}</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                        `).join('');
+                        
+                        if (data.unread_count > 0) {
+                            notificationBadge.textContent = data.unread_count;
+                            notificationBadge.style.display = 'block';
+                        } else {
+                            notificationBadge.style.display = 'none';
+                        }
+                    }
+                } catch (error) {
+                    notificationList.innerHTML = `
+                        <li class="text-center py-3 text-muted small">
+                            <i class="bi bi-wifi-off me-1"></i>Unable to load
+                        </li>
+                    `;
+                }
+            }
+            
+            // Load notifications on page load
+            loadNotifications();
+            
+            // Refresh every 60 seconds
+            setInterval(loadNotifications, 60000);
+            
+            // Make markAllRead available globally
+            window.markAllRead = function() {
+                notificationBadge.style.display = 'none';
+            };
         })();
         
         // Dark Mode

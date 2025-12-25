@@ -13,11 +13,11 @@
         <a href="{{ url_for('delegates.register_delegate') }}" class="btn btn-primary">
             <i class="bi bi-person-plus me-2"></i>Register
         </a>
-        <a href="{{ url_for('delegates.bulk_register') }}" class="btn btn-outline-primary">
-            <i class="bi bi-cloud-upload me-2"></i>Bulk Upload
+        <a href="{{ url_for('delegates.import_delegates') }}" class="btn btn-outline-primary" title="Import from CSV/Excel">
+            <i class="bi bi-upload me-2"></i>Import
         </a>
         {% endif %}
-        <a href="{{ url_for('delegates.export_delegates') }}" class="btn btn-outline-success" title="Export to Excel">
+        <a href="{{ url_for('delegates.export_delegates') }}" class="btn btn-outline-success" title="Export to CSV">
             <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export
         </a>
     </div>

@@ -34,7 +34,7 @@
                     <div class="row">
                         <div class="col-md-8 mb-3">
                             <label class="form-label">{{ form.name.label.text }} <span class="text-danger">*</span></label>
-                            {{ form.name(class="form-control", placeholder="Enter delegate's full name") }}
+                            {{ form.name(class="form-control", placeholder="Enter delegate's full name", id="delegateName") }}
                             {% for error in form.name.errors %}
                             <div class="text-danger small">{{ error }}</div>
                             {% endfor %}
@@ -49,6 +49,21 @@
                         </div>
                     </div>
                     
+                    <!-- Duplicate Warning Alert -->
+                    <div id="duplicateAlert" class="alert alert-warning d-none mb-3" role="alert">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                            <div class="flex-grow-1">
+                                <strong>Possible Duplicate Found!</strong>
+                                <p class="mb-2 small">A similar delegate may already be registered:</p>
+                                <div id="duplicateList"></div>
+                                <p class="mb-0 mt-2 small text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>If this is a different person, you can continue with registration.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ form.age_bracket.label.text }} <span class="text-danger">*</span></label>
@@ -59,7 +74,7 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ form.phone_number.label.text }}</label>
-                            {{ form.phone_number(class="form-control", placeholder="e.g., 0712345678") }}
+                            {{ form.phone_number(class="form-control", placeholder="e.g., 0712345678", id="delegatePhone") }}
                             {% for error in form.phone_number.errors %}
                             <div class="text-danger small">{{ error }}</div>
                             {% endfor %}
@@ -146,7 +161,14 @@
 document.addEventListener('DOMContentLoaded', function() {
     const archdeaconrySelect = document.getElementById('archdeaconry');
     const parishSelect = document.getElementById('parish');
+    const nameInput = document.getElementById('delegateName');
+    const phoneInput = document.getElementById('delegatePhone');
+    const duplicateAlert = document.getElementById('duplicateAlert');
+    const duplicateList = document.getElementById('duplicateList');
     
+    let checkTimeout = null;
+    
+    // Archdeaconry/Parish cascade
     archdeaconrySelect.addEventListener('change', function() {
         const selectedArchdeaconry = this.value;
         
@@ -170,6 +192,59 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         }
     });
+    
+    // Duplicate detection
+    function checkForDuplicates() {
+        const name = nameInput.value.trim();
+        const phone = phoneInput.value.trim();
+        
+        if (name.length < 3 && phone.length < 9) {
+            duplicateAlert.classList.add('d-none');
+            return;
+        }
+        
+        const params = new URLSearchParams();
+        if (name) params.append('name', name);
+        if (phone) params.append('phone', phone);
+        
+        fetch(`/api/check-duplicate?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.has_duplicates) {
+                    duplicateList.innerHTML = data.duplicates.map(dup => `
+                        <div class="d-flex align-items-center justify-content-between bg-white rounded p-2 mb-1">
+                            <div>
+                                <strong>${dup.name}</strong>
+                                <small class="text-muted d-block">${dup.parish} • ${dup.phone || 'No phone'}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${dup.match_type === 'phone' ? 'danger' : 'warning'}">
+                                    ${dup.confidence}% ${dup.match_type}
+                                </span>
+                                <a href="/delegates/${dup.id}" target="_blank" class="btn btn-sm btn-outline-secondary ms-1">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </div>
+                        </div>
+                    `).join('');
+                    duplicateAlert.classList.remove('d-none');
+                } else {
+                    duplicateAlert.classList.add('d-none');
+                }
+            })
+            .catch(error => {
+                console.error('Error checking duplicates:', error);
+            });
+    }
+    
+    // Debounced duplicate check
+    function debouncedCheck() {
+        clearTimeout(checkTimeout);
+        checkTimeout = setTimeout(checkForDuplicates, 500);
+    }
+    
+    nameInput.addEventListener('input', debouncedCheck);
+    phoneInput.addEventListener('input', debouncedCheck);
 });
 </script>
 {% endblock %}
