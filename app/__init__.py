@@ -87,6 +87,23 @@ def create_app(config_class=Config):
     # Import all models to ensure they are registered with SQLAlchemy
     from app.models import user, delegate, event, payment, audit, permission_request, fund_management, operations
     
+    # Custom Jinja filter for heatmap colors
+    def get_heatmap_color(intensity):
+        """Generate heatmap color based on intensity (0-1)"""
+        colors = ['#f0f9e8', '#bae4bc', '#7bccc4', '#43a2ca', '#0868ac']
+        if intensity <= 0:
+            return colors[0]
+        elif intensity < 0.25:
+            return colors[1]
+        elif intensity < 0.5:
+            return colors[2]
+        elif intensity < 0.75:
+            return colors[3]
+        else:
+            return colors[4]
+    
+    app.jinja_env.globals['get_heatmap_color'] = get_heatmap_color
+    
     # Make csrf_token() available in all templates
     @app.context_processor
     def inject_csrf_token():

@@ -5,10 +5,25 @@ import requests
 import secrets
 from app import db
 from app.models.user import User
+from app.models.session import UserSession
 from app.forms import LoginForm, RegistrationForm, OTPVerificationForm
 from app.utils.email import send_otp_email
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def create_user_session(user, token):
+    """Helper to create a user session record"""
+    try:
+        UserSession.create_session(
+            user=user,
+            session_token=token,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"Failed to create session record: {e}")
 
 
 # ==================== STANDARD AUTH ====================
@@ -79,6 +94,9 @@ def login():
             login_user(user)
             session['session_token'] = token
             
+            # Create session record
+            create_user_session(user, token)
+            
             next_page = request.args.get('next')
             flash(f'Welcome back, {user.name}!', 'success')
             return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
@@ -116,6 +134,9 @@ def verify_otp():
             
             login_user(user)
             session['session_token'] = token
+            
+            # Create session record
+            create_user_session(user, token)
             
             # Clear OTP session data
             next_page = session.pop('otp_next', None)
@@ -211,6 +232,17 @@ def register():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    # Mark session as inactive
+    token = session.get('session_token')
+    if token:
+        session_record = UserSession.query.filter_by(
+            session_token=token,
+            user_id=current_user.id
+        ).first()
+        if session_record:
+            session_record.is_active = False
+            db.session.commit()
+    
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))
@@ -364,6 +396,9 @@ def google_callback():
         
         # Store session token in browser session
         session['session_token'] = token
+        
+        # Create session record
+        create_user_session(user, token)
         
         # Check if user needs to complete profile
         if not user.local_church or not user.parish:

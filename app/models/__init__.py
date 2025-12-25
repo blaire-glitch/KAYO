@@ -17,6 +17,7 @@ from app.models.finance import (
     Voucher, VoucherItem, FinancialPeriod, BudgetLine
 )
 from app.models.budget import Budget, BudgetItem, BudgetExpenditure
+from app.models.session import UserSession
 
 __all__ = [
     'User', 'Delegate', 'Payment',
@@ -29,5 +30,6 @@ __all__ = [
     'PendingDelegate',
     'AccountCategory', 'Account', 'JournalEntry', 'JournalLine',
     'Voucher', 'VoucherItem', 'FinancialPeriod', 'BudgetLine',
-    'Budget', 'BudgetItem', 'BudgetExpenditure'
+    'Budget', 'BudgetItem', 'BudgetExpenditure',
+    'UserSession'
 ]

@@ -1072,3 +1072,68 @@ def charts_dashboard():
         payment_methods=[{'method': p.payment_method or 'Unknown', 'count': p.count, 'amount': float(p.amount or 0)} for p in payment_methods],
         days=days
     )
+
+
+@admin_bp.route('/parish-heatmap')
+@login_required
+@admin_required
+def parish_heatmap():
+    """Parish activity heatmap visualization"""
+    from app.church_data import CHURCH_DATA
+    
+    # Get parish statistics
+    parish_stats = db.session.query(
+        Delegate.parish,
+        Delegate.archdeaconry,
+        func.count(Delegate.id).label('total'),
+        func.sum(db.case((Delegate.is_paid == True, 1), else_=0)).label('paid'),
+        func.sum(db.case((Delegate.checked_in == True, 1), else_=0)).label('checked_in')
+    ).group_by(Delegate.parish, Delegate.archdeaconry).all()
+    
+    # Convert to dictionary for easy lookup
+    parish_data = {}
+    for stat in parish_stats:
+        parish_data[stat.parish] = {
+            'archdeaconry': stat.archdeaconry,
+            'total': stat.total,
+            'paid': int(stat.paid or 0),
+            'checked_in': int(stat.checked_in or 0),
+            'payment_rate': round((int(stat.paid or 0) / stat.total * 100), 1) if stat.total > 0 else 0
+        }
+    
+    # Build complete data structure with all parishes from church_data
+    heatmap_data = []
+    for archdeaconry, parishes in CHURCH_DATA.items():
+        arch_data = {
+            'name': archdeaconry,
+            'parishes': [],
+            'total': 0,
+            'paid': 0,
+            'checked_in': 0
+        }
+        
+        for parish in parishes:
+            stats = parish_data.get(parish, {'total': 0, 'paid': 0, 'checked_in': 0, 'payment_rate': 0})
+            arch_data['parishes'].append({
+                'name': parish,
+                'total': stats.get('total', 0),
+                'paid': stats.get('paid', 0),
+                'checked_in': stats.get('checked_in', 0),
+                'payment_rate': stats.get('payment_rate', 0)
+            })
+            arch_data['total'] += stats.get('total', 0)
+            arch_data['paid'] += stats.get('paid', 0)
+            arch_data['checked_in'] += stats.get('checked_in', 0)
+        
+        heatmap_data.append(arch_data)
+    
+    # Sort by total delegates
+    heatmap_data.sort(key=lambda x: x['total'], reverse=True)
+    
+    # Calculate max values for color scaling
+    max_delegates = max((p['total'] for a in heatmap_data for p in a['parishes']), default=1)
+    
+    return render_template('admin/parish_heatmap.html',
+        heatmap_data=heatmap_data,
+        max_delegates=max_delegates
+    )

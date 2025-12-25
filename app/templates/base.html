@@ -651,6 +651,7 @@
                             <li><span class="dropdown-item-text text-muted small">{{ current_user.email }}</span></li>
                             <li><span class="dropdown-item-text"><span class="badge bg-primary">{% if current_user.role == 'viewer' %}SUPER DYO{% else %}{{ current_user.role|title }}{% endif %}</span></span></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('settings.my_sessions') }}"><i class="bi bi-laptop me-2"></i>Active Sessions</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                         </ul>
                     </li>
@@ -752,6 +753,11 @@
                         <li class="nav-item">
                             <a class="nav-link {% if 'admin.charts_dashboard' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.charts_dashboard') }}">
                                 <i class="bi bi-graph-up"></i>Charts Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'admin.parish_heatmap' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.parish_heatmap') }}">
+                                <i class="bi bi-grid-3x3-gap"></i>Parish Heatmap
                             </a>
                         </li>
                         <li class="nav-item">
