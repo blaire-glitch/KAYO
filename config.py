@@ -13,8 +13,10 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ['true', '1', 'yes']
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours session lifetime
     WTF_CSRF_ENABLED = True
-    WTF_CSRF_TIME_LIMIT = 3600  # 1 hour CSRF token validity
+    WTF_CSRF_TIME_LIMIT = None  # No expiration - token valid for entire session
+    WTF_CSRF_SSL_STRICT = False  # Allow CSRF over HTTP for development
     
     # M-Pesa Daraja API Configuration
     MPESA_CONSUMER_KEY = os.environ.get('MPESA_CONSUMER_KEY')
