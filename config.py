@@ -9,6 +9,13 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///kayo.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Session Configuration for proper CSRF handling
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ['true', '1', 'yes']
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    WTF_CSRF_ENABLED = True
+    WTF_CSRF_TIME_LIMIT = 3600  # 1 hour CSRF token validity
+    
     # M-Pesa Daraja API Configuration
     MPESA_CONSUMER_KEY = os.environ.get('MPESA_CONSUMER_KEY')
     MPESA_CONSUMER_SECRET = os.environ.get('MPESA_CONSUMER_SECRET')

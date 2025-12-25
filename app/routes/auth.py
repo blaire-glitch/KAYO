@@ -19,7 +19,18 @@ def login():
         return redirect(url_for('main.dashboard'))
     
     form = LoginForm()
-    if form.validate_on_submit():
+    if request.method == 'POST':
+        if not form.validate_on_submit():
+            # Log form validation errors for debugging
+            if form.errors:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        if field == 'csrf_token':
+                            flash('Session expired. Please try again.', 'warning')
+                        else:
+                            flash(f'{field}: {error}', 'danger')
+            return render_template('auth/login.html', form=form)
+        
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
             if not user.is_active:
