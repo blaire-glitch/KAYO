@@ -741,7 +741,12 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if 'finance.budget' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.budget_overview') }}">
-                                <i class="bi bi-pie-chart"></i>Budget
+                                <i class="bi bi-pie-chart"></i>Budget (Legacy)
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'budget.' in request.endpoint %}active{% endif %}" href="{{ url_for('budget.index') }}">
+                                <i class="bi bi-wallet2"></i>Budget Manager
                             </a>
                         </li>
                         <li class="nav-item">
