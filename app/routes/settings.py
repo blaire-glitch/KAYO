@@ -404,7 +404,7 @@ def my_sessions():
     except Exception as e:
         # Table might not exist yet
         flash('Session management is not available. Please contact administrator.', 'warning')
-        return redirect(url_for('settings.account'))
+        return redirect(url_for('main.dashboard'))
 
 
 @settings_bp.route('/sessions/<int:session_id>/revoke', methods=['POST'])
