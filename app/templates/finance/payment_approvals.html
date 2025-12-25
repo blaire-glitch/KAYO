@@ -103,13 +103,13 @@
                         {% for payment in pending_payments %}
                         <tr>
                             <td>
-                                <strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong>
+                                <strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong>
                             </td>
                             <td>
                                 {% if payment.confirmed_by_chair %}
                                 <span class="badge bg-secondary">
                                     <i class="fas fa-user me-1"></i>
-                                    {{ payment.confirmed_by_chair.full_name }}
+                                    {{ payment.confirmed_by_chair.name }}
                                 </span>
                                 <br>
                                 <small class="text-muted">{{ payment.confirmed_by_chair.parish or 'Unknown Parish' }}</small>
@@ -124,21 +124,21 @@
                             </td>
                             <td>
                                 <span class="badge bg-primary">
-                                    {{ payment.delegates|length }} delegate(s)
+                                    {{ payment.delegates.count() }} delegate(s)
                                 </span>
-                                {% for delegate in payment.delegates[:3] %}
-                                <br><small class="text-muted">{{ delegate.full_name }}</small>
+                                {% for delegate in payment.delegates.limit(3) %}
+                                <br><small class="text-muted">{{ delegate.name }}</small>
                                 {% endfor %}
-                                {% if payment.delegates|length > 3 %}
-                                <br><small class="text-muted">+{{ payment.delegates|length - 3 }} more...</small>
+                                {% if payment.delegates.count() > 3 %}
+                                <br><small class="text-muted">+{{ payment.delegates.count() - 3 }} more...</small>
                                 {% endif %}
                             </td>
                             <td>
                                 <strong class="text-success">KES {{ "{:,.2f}".format(payment.amount) }}</strong>
                             </td>
                             <td>
-                                <span class="badge bg-{{ 'success' if payment.payment_method == 'mpesa' else 'secondary' }}">
-                                    {{ payment.payment_method|upper if payment.payment_method else 'CASH' }}
+                                <span class="badge bg-{{ 'success' if 'M-Pesa' in (payment.payment_mode or '') else 'secondary' }}">
+                                    {{ payment.payment_mode or 'CASH' }}
                                 </span>
                             </td>
                             <td class="text-center">
@@ -181,12 +181,12 @@
                                             </div>
                                             <div class="alert alert-info">
                                                 <strong>Amount:</strong> KES {{ "{:,.2f}".format(payment.amount) }}<br>
-                                                <strong>Delegates:</strong> {{ payment.delegates|length }}<br>
-                                                <strong>Submitted by:</strong> {{ payment.confirmed_by_chair.full_name if payment.confirmed_by_chair else 'Unknown' }}
+                                                <strong>Delegates:</strong> {{ payment.delegates.count() }}<br>
+                                                <strong>Submitted by:</strong> {{ payment.confirmed_by_chair.name if payment.confirmed_by_chair else 'Unknown' }}
                                             </div>
                                             <p>Approving this payment will:</p>
                                             <ul>
-                                                <li>Mark {{ payment.delegates|length }} delegate(s) as <strong>PAID</strong></li>
+                                                <li>Mark {{ payment.delegates.count() }} delegate(s) as <strong>PAID</strong></li>
                                                 <li><strong>Issue tickets</strong> to delegates</li>
                                                 <li>Complete the payment transaction</li>
                                             </ul>
@@ -223,7 +223,7 @@
                                         <div class="modal-body">
                                             <div class="alert alert-warning">
                                                 <strong>Amount:</strong> KES {{ "{:,.2f}".format(payment.amount) }}<br>
-                                                <strong>Delegates:</strong> {{ payment.delegates|length }}
+                                                <strong>Delegates:</strong> {{ payment.delegates.count() }}
                                             </div>
                                             <p class="text-danger">
                                                 <i class="fas fa-exclamation-triangle me-1"></i>

@@ -104,10 +104,10 @@
                     <tbody>
                         {% for payment in payments %}
                         <tr>
-                            <td><strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong></td>
+                            <td><strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong></td>
                             <td>
                                 {% if payment.confirmed_by_chair %}
-                                {{ payment.confirmed_by_chair.full_name }}
+                                {{ payment.confirmed_by_chair.name }}
                                 <br><small class="text-muted">{{ payment.confirmed_by_chair.parish or '' }}</small>
                                 {% else %}
                                 <span class="text-muted">-</span>
@@ -122,12 +122,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-primary">{{ payment.delegates|length }}</span>
+                                <span class="badge bg-primary">{{ payment.delegates.count() }}</span>
                             </td>
                             <td><strong class="text-success">KES {{ "{:,.2f}".format(payment.amount) }}</strong></td>
                             <td>
                                 <span class="badge bg-secondary">
-                                    {{ payment.payment_method|upper if payment.payment_method else 'CASH' }}
+                                    {{ payment.payment_mode or 'CASH' }}
                                 </span>
                             </td>
                             <td>

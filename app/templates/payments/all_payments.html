@@ -143,14 +143,14 @@
                             <td>{{ payment.phone_number or '-' }}</td>
                             <td><strong class="text-success">KSh {{ "{:,.0f}".format(payment.amount) }}</strong></td>
                             <td>
-                                {% if payment.payment_method == 'mpesa' %}
+                                {% if payment.payment_mode == 'mpesa' or 'M-Pesa' in (payment.payment_mode or '') %}
                                 <span class="badge bg-success">M-Pesa</span>
-                                {% elif payment.payment_method == 'cash' %}
+                                {% elif payment.payment_mode == 'cash' or 'Cash' in (payment.payment_mode or '') %}
                                 <span class="badge bg-secondary">Cash</span>
-                                {% elif payment.payment_method == 'transfer' %}
+                                {% elif payment.payment_mode == 'transfer' or 'Transfer' in (payment.payment_mode or '') %}
                                 <span class="badge bg-info">Transfer</span>
                                 {% else %}
-                                <span class="badge bg-light text-dark">{{ payment.payment_method or 'Unknown' }}</span>
+                                <span class="badge bg-light text-dark">{{ payment.payment_mode or 'Unknown' }}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -229,7 +229,7 @@
                                             </tr>
                                             <tr>
                                                 <th>Payment Method</th>
-                                                <td>{{ payment.payment_method or 'N/A' }}</td>
+                                                <td>{{ payment.payment_mode or 'N/A' }}</td>
                                             </tr>
                                             <tr>
                                                 <th>M-Pesa Receipt</th>

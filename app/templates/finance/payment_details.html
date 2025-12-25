@@ -30,7 +30,7 @@
                             <table class="table table-borderless">
                                 <tr>
                                     <th class="text-muted" width="40%">Reference:</th>
-                                    <td><strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong></td>
+                                    <td><strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong></td>
                                 </tr>
                                 <tr>
                                     <th class="text-muted">Amount:</th>
@@ -39,16 +39,16 @@
                                 <tr>
                                     <th class="text-muted">Payment Method:</th>
                                     <td>
-                                        <span class="badge bg-{{ 'success' if payment.payment_method == 'mpesa' else 'secondary' }}">
-                                            {{ payment.payment_method|upper if payment.payment_method else 'CASH' }}
+                                        <span class="badge bg-{{ 'success' if 'M-Pesa' in (payment.payment_mode or '') else 'secondary' }}">
+                                            {{ payment.payment_mode or 'CASH' }}
                                         </span>
                                     </td>
                                 </tr>
                                 <tr>
                                     <th class="text-muted">Payment Status:</th>
                                     <td>
-                                        <span class="badge bg-{{ 'success' if payment.payment_status == 'completed' else 'warning' }}">
-                                            {{ payment.payment_status|title }}
+                                        <span class="badge bg-{{ 'success' if payment.status == 'completed' else 'warning' }}">
+                                            {{ payment.status|title }}
                                         </span>
                                     </td>
                                 </tr>
@@ -93,7 +93,7 @@
                 <div class="card-header bg-white">
                     <h5 class="mb-0">
                         <i class="fas fa-users me-2"></i>
-                        Associated Delegates ({{ payment.delegates|length }})
+                        Associated Delegates ({{ payment.delegates.count() }})
                     </h5>
                 </div>
                 <div class="card-body p-0">
@@ -114,9 +114,9 @@
                                 <tr>
                                     <td>{{ loop.index }}</td>
                                     <td>
-                                        <strong>{{ delegate.full_name }}</strong>
-                                        {% if delegate.phone %}
-                                        <br><small class="text-muted">{{ delegate.phone }}</small>
+                                        <strong>{{ delegate.name }}</strong>
+                                        {% if delegate.phone_number %}
+                                        <br><small class="text-muted">{{ delegate.phone_number }}</small>
                                         {% endif %}
                                     </td>
                                     <td>{{ delegate.parish or 'N/A' }}</td>
@@ -125,7 +125,7 @@
                                     </td>
                                     <td>{{ delegate.age_bracket or 'N/A' }}</td>
                                     <td>
-                                        {% if delegate.has_paid %}
+                                        {% if delegate.is_paid %}
                                         <span class="badge bg-success">Paid</span>
                                         {% else %}
                                         <span class="badge bg-warning">Pending</span>
@@ -155,7 +155,7 @@
                     <div class="mb-3">
                         <i class="fas fa-user-circle fa-4x text-secondary"></i>
                     </div>
-                    <h5>{{ chair.full_name }}</h5>
+                    <h5>{{ chair.name }}</h5>
                     <p class="text-muted mb-1">
                         <i class="fas fa-church me-1"></i>
                         {{ chair.parish or 'Unknown Parish' }}

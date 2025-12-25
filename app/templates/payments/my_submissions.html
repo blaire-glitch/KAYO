@@ -123,15 +123,15 @@
                             <tbody>
                                 {% for payment in pending %}
                                 <tr>
-                                    <td><strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong></td>
+                                    <td><strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong></td>
                                     <td>
                                         {{ payment.created_at.strftime('%d %b %Y') }}
                                         <br><small class="text-muted">{{ payment.created_at.strftime('%H:%M') }}</small>
                                     </td>
                                     <td>
                                         <span class="badge bg-primary">{{ payment.delegates.count() }}</span>
-                                        {% for delegate in payment.delegates[:2] %}
-                                        <br><small>{{ delegate.full_name }}</small>
+                                        {% for delegate in payment.delegates.limit(2) %}
+                                        <br><small>{{ delegate.name }}</small>
                                         {% endfor %}
                                         {% if payment.delegates.count() > 2 %}
                                         <br><small class="text-muted">+{{ payment.delegates.count() - 2 }} more</small>
@@ -140,7 +140,7 @@
                                     <td><strong class="text-success">KES {{ "{:,.2f}".format(payment.amount) }}</strong></td>
                                     <td>
                                         <span class="badge bg-secondary">
-                                            {{ payment.payment_method|upper if payment.payment_method else 'CASH' }}
+                                            {{ payment.payment_mode or 'CASH' }}
                                         </span>
                                     </td>
                                     <td>
@@ -185,7 +185,7 @@
                             <tbody>
                                 {% for payment in approved %}
                                 <tr>
-                                    <td><strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong></td>
+                                    <td><strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong></td>
                                     <td>{{ payment.created_at.strftime('%d %b %Y') }}</td>
                                     <td>
                                         {% if payment.approved_by_finance_at %}
@@ -239,7 +239,7 @@
                             <tbody>
                                 {% for payment in rejected %}
                                 <tr>
-                                    <td><strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong></td>
+                                    <td><strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong></td>
                                     <td>{{ payment.created_at.strftime('%d %b %Y') }}</td>
                                     <td><strong>KES {{ "{:,.2f}".format(payment.amount) }}</strong></td>
                                     <td>

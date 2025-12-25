@@ -951,18 +951,27 @@ def approve_payment(payment_id):
         payment.approve_by_finance(current_user.id, notes)
         
         # Mark all associated delegates as paid and issue tickets
+        tickets_issued = 0
         for delegate in payment.delegates:
-            delegate.has_paid = True
-            delegate.payment_date = datetime.utcnow()
-            if not delegate.ticket_number:
-                delegate.issue_ticket()
+            delegate.is_paid = True
+            delegate.payment_confirmed_by = current_user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
+            if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                from app.models.event import Event
+                event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                delegate.ticket_number = Delegate.generate_ticket_number(event)
+                tickets_issued += 1
         
         db.session.commit()
         
-        flash(f'Payment of KES {payment.amount:,.2f} approved successfully. {len(payment.delegates.all())} delegate(s) marked as paid.', 'success')
+        delegate_count = payment.delegates.count()
+        flash(f'Payment of KES {payment.amount:,.2f} approved successfully. {delegate_count} delegate(s) marked as paid. {tickets_issued} ticket(s) issued.', 'success')
         
     except Exception as e:
         db.session.rollback()
+        current_app.logger.error(f'Error approving payment: {str(e)}')
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         flash(f'Error approving payment: {str(e)}', 'danger')
     
     return redirect(url_for('finance.payment_approvals'))

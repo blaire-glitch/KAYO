@@ -683,6 +683,13 @@
                             </a>
                         </li>
                         {% endif %}
+                        {% if current_user.role == 'chair' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'payments.my_submissions' in request.endpoint %}active{% endif %}" href="{{ url_for('payments.my_submissions') }}">
+                                <i class="bi bi-send-check"></i>My Submissions
+                            </a>
+                        </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'payments.payment_history' %}active{% endif %}" href="{{ url_for('payments.payment_history') }}">
                                 <i class="bi bi-clock-history"></i>History
@@ -704,6 +711,11 @@
                         <li class="nav-item">
                             <a class="nav-link {% if 'payments.finance_payment_dashboard' in request.endpoint %}active{% endif %}" href="{{ url_for('payments.finance_payment_dashboard') }}">
                                 <i class="bi bi-speedometer2"></i>Finance Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'finance.payment_approvals' in request.endpoint %}active{% endif %}" href="{{ url_for('finance.payment_approvals') }}">
+                                <i class="bi bi-check2-square"></i>Payment Approvals
                             </a>
                         </li>
                         <li class="nav-item">

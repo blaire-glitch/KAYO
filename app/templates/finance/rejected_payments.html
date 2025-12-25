@@ -43,10 +43,10 @@
                     <tbody>
                         {% for payment in payments %}
                         <tr>
-                            <td><strong>{{ payment.reference or payment.mpesa_code or 'N/A' }}</strong></td>
+                            <td><strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong></td>
                             <td>
                                 {% if payment.confirmed_by_chair %}
-                                {{ payment.confirmed_by_chair.full_name }}
+                                {{ payment.confirmed_by_chair.name }}
                                 <br><small class="text-muted">{{ payment.confirmed_by_chair.parish or '' }}</small>
                                 {% else %}
                                 <span class="text-muted">-</span>
@@ -57,7 +57,7 @@
                                 <br><small class="text-muted">{{ payment.created_at.strftime('%H:%M') }}</small>
                             </td>
                             <td>
-                                <span class="badge bg-secondary">{{ payment.delegates|length }}</span>
+                                <span class="badge bg-secondary">{{ payment.delegates.count() }}</span>
                             </td>
                             <td><strong>KES {{ "{:,.2f}".format(payment.amount) }}</strong></td>
                             <td>
