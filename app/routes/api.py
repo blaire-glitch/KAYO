@@ -94,6 +94,125 @@ def global_search():
     return jsonify({'results': results, 'query': query})
 
 
+@api_bp.route('/activity-feed')
+@login_required
+def activity_feed():
+    """Get recent activity feed - registrations, payments, check-ins"""
+    from app.models.delegate import Delegate
+    from app.models.payment import Payment
+    from app.models.user import User
+    from app.models.event import CheckInRecord
+    from datetime import datetime, timedelta
+    
+    activities = []
+    
+    # Get recent delegates (last 7 days)
+    recent_delegates = Delegate.query.filter(
+        Delegate.created_at >= datetime.utcnow() - timedelta(days=7)
+    ).order_by(Delegate.created_at.desc()).limit(10).all()
+    
+    for d in recent_delegates:
+        activities.append({
+            'type': 'registration',
+            'icon': 'bi-person-plus-fill',
+            'color': 'success',
+            'title': f'{d.full_name} registered',
+            'subtitle': f'{d.parish} • {d.archdeaconry}',
+            'time': d.created_at.isoformat(),
+            'time_ago': time_ago(d.created_at),
+            'url': f'/delegates/{d.id}'
+        })
+    
+    # Get recent payments (last 7 days)
+    if current_user.role in ['admin', 'super_admin', 'finance', 'treasurer']:
+        recent_payments = Payment.query.filter(
+            Payment.payment_date >= datetime.utcnow() - timedelta(days=7),
+            Payment.status == 'completed'
+        ).order_by(Payment.payment_date.desc()).limit(10).all()
+        
+        for p in recent_payments:
+            payer = p.delegate.full_name if p.delegate else (p.user.name if p.user else 'Unknown')
+            activities.append({
+                'type': 'payment',
+                'icon': 'bi-cash-coin',
+                'color': 'primary',
+                'title': f'KES {p.amount:,.0f} received',
+                'subtitle': f'From {payer} • {p.transaction_code or "Manual"}',
+                'time': p.payment_date.isoformat(),
+                'time_ago': time_ago(p.payment_date),
+                'url': '/finance/dashboard'
+            })
+    
+    # Get recent check-ins (last 7 days)
+    try:
+        recent_checkins = CheckInRecord.query.filter(
+            CheckInRecord.checked_in_at >= datetime.utcnow() - timedelta(days=7)
+        ).order_by(CheckInRecord.checked_in_at.desc()).limit(10).all()
+        
+        for c in recent_checkins:
+            activities.append({
+                'type': 'checkin',
+                'icon': 'bi-check-circle-fill',
+                'color': 'info',
+                'title': f'{c.delegate.full_name if c.delegate else "Unknown"} checked in',
+                'subtitle': f'At {c.event.name if c.event else "Event"}',
+                'time': c.checked_in_at.isoformat(),
+                'time_ago': time_ago(c.checked_in_at),
+                'url': '/checkin/dashboard'
+            })
+    except:
+        pass  # CheckInRecord might not exist
+    
+    # Get recent user approvals (admin only)
+    if current_user.role in ['admin', 'super_admin']:
+        recent_users = User.query.filter(
+            User.created_at >= datetime.utcnow() - timedelta(days=7),
+            User.is_approved == True
+        ).order_by(User.created_at.desc()).limit(5).all()
+        
+        for u in recent_users:
+            activities.append({
+                'type': 'user',
+                'icon': 'bi-person-check-fill',
+                'color': 'warning',
+                'title': f'{u.name} joined',
+                'subtitle': f'{u.role.title()} • {u.parish or "No parish"}',
+                'time': u.created_at.isoformat(),
+                'time_ago': time_ago(u.created_at),
+                'url': f'/admin/users/{u.id}'
+            })
+    
+    # Sort all activities by time (most recent first)
+    activities.sort(key=lambda x: x['time'], reverse=True)
+    
+    return jsonify({
+        'activities': activities[:20],  # Return top 20 activities
+        'count': len(activities)
+    })
+
+
+def time_ago(dt):
+    """Convert datetime to human-readable time ago string"""
+    from datetime import datetime
+    now = datetime.utcnow()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    if seconds < 60:
+        return 'Just now'
+    elif seconds < 3600:
+        mins = int(seconds / 60)
+        return f'{mins}m ago'
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        return f'{hours}h ago'
+    elif seconds < 604800:
+        days = int(seconds / 86400)
+        return f'{days}d ago'
+    else:
+        return dt.strftime('%d %b')
+
+
 @api_bp.route('/parishes/<archdeaconry>')
 def get_parishes_for_archdeaconry(archdeaconry):
     """API endpoint to get parishes for a specific archdeaconry"""
