@@ -168,6 +168,16 @@ def initiate_mpesa_payment(form, unpaid_delegates, total_amount, delegate_fee):
 def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
     """Handle cash payment confirmation - sets status to pending finance approval for chairs"""
     try:
+        # Double-check: filter out any delegates that already have a payment_id (race condition protection)
+        unpaid_delegates = [d for d in unpaid_delegates if d.payment_id is None]
+        
+        if not unpaid_delegates:
+            flash('All selected delegates already have pending payments.', 'warning')
+            return redirect(url_for('payments.payment_page'))
+        
+        # Recalculate total after filtering
+        total_amount = sum(d.get_registration_fee() for d in unpaid_delegates)
+        
         # Determine if this is a chair submitting (needs finance approval) or finance directly confirming
         is_chair = current_user.role == 'chair'
         is_finance = current_user.role in ['finance', 'treasurer', 'admin', 'super_admin']
