@@ -392,45 +392,54 @@ def _is_mpesa_configured():
 @login_required
 def my_sessions():
     """View and manage active sessions"""
-    current_token = session.get('session_token')
-    sessions = UserSession.get_active_sessions(current_user.id)
-    
-    # Mark current session
-    for s in sessions:
-        s.is_current_session = (s.session_token == current_token)
-    
-    return render_template('settings/sessions.html', sessions=sessions)
+    try:
+        current_token = session.get('session_token')
+        sessions = UserSession.get_active_sessions(current_user.id)
+        
+        # Mark current session
+        for s in sessions:
+            s.is_current_session = (s.session_token == current_token)
+        
+        return render_template('settings/sessions.html', sessions=sessions)
+    except Exception as e:
+        # Table might not exist yet
+        flash('Session management is not available. Please contact administrator.', 'warning')
+        return redirect(url_for('settings.account'))
 
 
 @settings_bp.route('/sessions/<int:session_id>/revoke', methods=['POST'])
 @login_required
 def revoke_session(session_id):
     """Revoke a specific session"""
-    current_token = session.get('session_token')
-    
-    # Find the session
-    session_record = UserSession.query.filter_by(
-        id=session_id, 
-        user_id=current_user.id
-    ).first()
-    
-    if not session_record:
-        flash('Session not found.', 'error')
-        return redirect(url_for('settings.my_sessions'))
-    
-    # Don't allow revoking current session
-    if session_record.session_token == current_token:
-        flash('You cannot revoke your current session. Use logout instead.', 'warning')
-        return redirect(url_for('settings.my_sessions'))
-    
-    session_record.is_active = False
-    db.session.commit()
-    
-    # Log the action
-    current_user.log_activity('revoke', 'session', session_id, 
-                              f'Revoked session from {session_record.browser} on {session_record.os}')
-    
-    flash('Session revoked successfully.', 'success')
+    try:
+        current_token = session.get('session_token')
+        
+        # Find the session
+        session_record = UserSession.query.filter_by(
+            id=session_id, 
+            user_id=current_user.id
+        ).first()
+        
+        if not session_record:
+            flash('Session not found.', 'error')
+            return redirect(url_for('settings.my_sessions'))
+        
+        # Don't allow revoking current session
+        if session_record.session_token == current_token:
+            flash('You cannot revoke your current session. Use logout instead.', 'warning')
+            return redirect(url_for('settings.my_sessions'))
+        
+        session_record.is_active = False
+        db.session.commit()
+        
+        # Log the action
+        current_user.log_activity('revoke', 'session', session_id, 
+                                  f'Revoked session from {session_record.browser} on {session_record.os}')
+        
+        flash('Session revoked successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Unable to revoke session.', 'error')
     return redirect(url_for('settings.my_sessions'))
 
 
@@ -438,26 +447,30 @@ def revoke_session(session_id):
 @login_required
 def revoke_all_sessions():
     """Revoke all sessions except current"""
-    current_token = session.get('session_token')
-    
-    # Count sessions to revoke
-    count = UserSession.query.filter(
-        UserSession.user_id == current_user.id,
-        UserSession.session_token != current_token,
-        UserSession.is_active == True
-    ).count()
-    
-    if count == 0:
-        flash('No other active sessions to revoke.', 'info')
-        return redirect(url_for('settings.my_sessions'))
-    
-    # Revoke all other sessions
-    UserSession.revoke_all_other_sessions(current_user.id, current_token)
-    db.session.commit()
-    
-    # Log the action
-    current_user.log_activity('revoke', 'session', None, 
-                              f'Revoked all other sessions ({count} sessions)')
-    
-    flash(f'Successfully revoked {count} other session(s).', 'success')
+    try:
+        current_token = session.get('session_token')
+        
+        # Count sessions to revoke
+        count = UserSession.query.filter(
+            UserSession.user_id == current_user.id,
+            UserSession.session_token != current_token,
+            UserSession.is_active == True
+        ).count()
+        
+        if count == 0:
+            flash('No other active sessions to revoke.', 'info')
+            return redirect(url_for('settings.my_sessions'))
+        
+        # Revoke all other sessions
+        UserSession.revoke_all_other_sessions(current_user.id, current_token)
+        db.session.commit()
+        
+        # Log the action
+        current_user.log_activity('revoke', 'session', None, 
+                                  f'Revoked all other sessions ({count} sessions)')
+        
+        flash(f'Successfully revoked {count} other session(s).', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Unable to revoke sessions.', 'error')
     return redirect(url_for('settings.my_sessions'))
