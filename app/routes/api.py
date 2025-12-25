@@ -101,7 +101,7 @@ def activity_feed():
     from app.models.delegate import Delegate
     from app.models.payment import Payment
     from app.models.user import User
-    from app.models.event import CheckInRecord
+    from app.models.operations import CheckInRecord
     from datetime import datetime, timedelta
     
     activities = []
