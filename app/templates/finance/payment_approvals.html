@@ -270,3 +270,24 @@
 {% endfor %}
 {% endif %}
 {% endblock %}
+
+{% block extra_js %}
+<script>
+// Handle form submission with loading state
+document.addEventListener('DOMContentLoaded', function() {
+    // Get all approve and reject forms
+    const forms = document.querySelectorAll('form[action*="/approve"], form[action*="/reject"]');
+    
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing...';
+            }
+            // Allow form to submit normally - the redirect will refresh the page
+        });
+    });
+});
+</script>
+{% endblock %}
