@@ -148,7 +148,7 @@
                         <td>
                             <strong>{{ categories.get(cat, cat|title) }}</strong>
                         </td>
-                        <td class="text-center">{{ data.items }}</td>
+                        <td class="text-center">{{ data.item_count }}</td>
                         <td class="text-end">KSh {{ "{:,.0f}".format(data.budgeted) }}</td>
                         <td class="text-end {{ 'text-danger fw-bold' if data.spent > data.budgeted else '' }}">
                             KSh {{ "{:,.0f}".format(data.spent) }}

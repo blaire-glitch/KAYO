@@ -515,10 +515,10 @@ def report(id):
     for item in budget.items:
         cat = item.category
         if cat not in category_stats:
-            category_stats[cat] = {'budgeted': 0, 'spent': 0, 'items': 0}
+            category_stats[cat] = {'budgeted': 0, 'spent': 0, 'item_count': 0}
         category_stats[cat]['budgeted'] += item.budgeted_amount
         category_stats[cat]['spent'] += item.actual_spent
-        category_stats[cat]['items'] += 1
+        category_stats[cat]['item_count'] += 1
     
     return render_template('budget/report.html', 
                          budget=budget, 
