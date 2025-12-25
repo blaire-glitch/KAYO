@@ -817,7 +817,7 @@ def verify_payment(payment_id):
 @payments_bp.route('/finance/receive', methods=['GET', 'POST'])
 @login_required
 def receive_payment():
-    """Receive cash/manual payment from chair"""
+    """Receive cash/manual payment from chair - for direct payments (not pending approval)"""
     if current_user.role not in ['finance', 'admin', 'super_admin']:
         flash('Access denied. Finance personnel only.', 'danger')
         return redirect(url_for('main.dashboard'))
@@ -825,14 +825,25 @@ def receive_payment():
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     
     # Get all unpaid delegates grouped by chair
+    # Exclude delegates that already have a pending payment (payment_id is set)
     from app.models.user import User
     chairs = User.query.filter(User.role.in_(['chair', 'registration_officer', 'data_clerk'])).all()
     
     unpaid_by_chair = {}
     for chair in chairs:
-        unpaid = Delegate.query.filter_by(registered_by=chair.id, is_paid=False).all()
+        # Only get delegates without a pending payment
+        unpaid = Delegate.query.filter(
+            Delegate.registered_by == chair.id,
+            Delegate.is_paid == False,
+            Delegate.payment_id == None  # No pending payment
+        ).all()
+        # Filter out fee-exempt delegates
+        unpaid = [d for d in unpaid if not d.is_fee_exempt()]
         if unpaid:
             unpaid_by_chair[chair] = unpaid
+    
+    # Count pending approvals for info
+    pending_approval_count = Payment.query.filter_by(finance_status='pending_approval').count()
     
     if request.method == 'POST':
         delegate_ids = request.form.getlist('delegate_ids')
@@ -843,10 +854,20 @@ def receive_payment():
             flash('Please select at least one delegate.', 'warning')
             return redirect(url_for('payments.receive_payment'))
         
-        delegates = Delegate.query.filter(Delegate.id.in_(delegate_ids)).all()
-        total_amount = len(delegates) * delegate_fee
+        # Get delegates - only those without pending payment (race condition protection)
+        delegates = Delegate.query.filter(
+            Delegate.id.in_(delegate_ids),
+            Delegate.payment_id == None
+        ).all()
         
-        # Create payment record
+        if not delegates:
+            flash('All selected delegates already have pending payments.', 'warning')
+            return redirect(url_for('payments.receive_payment'))
+        
+        # Calculate total based on each delegate's actual fee
+        total_amount = sum(d.get_registration_fee() for d in delegates)
+        
+        # Create payment record - finance directly approves
         payment = Payment(
             user_id=current_user.id,
             amount=total_amount,
@@ -855,27 +876,35 @@ def receive_payment():
             result_desc=f"Cash received by {current_user.name}. {notes}",
             delegates_count=len(delegates),
             status='completed',
+            finance_status='approved',
+            approved_by_finance_id=current_user.id,
+            approved_by_finance_at=datetime.utcnow(),
             completed_at=datetime.utcnow()
         )
         db.session.add(payment)
         db.session.flush()
         
         # Update delegates
+        tickets_issued = 0
         for delegate in delegates:
             delegate.payment_id = payment.id
             delegate.is_paid = True
-            delegate.paid_at = datetime.utcnow()
+            delegate.amount_paid = delegate.get_registration_fee()
+            delegate.payment_confirmed_by = current_user.id
+            delegate.payment_confirmed_at = datetime.utcnow()
             if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
                 event = Event.query.get(delegate.event_id) if delegate.event_id else None
                 delegate.ticket_number = Delegate.generate_ticket_number(event)
+                tickets_issued += 1
         
         db.session.commit()
-        flash(f'Payment received for {len(delegates)} delegate(s). Total: KSh {total_amount:,}', 'success')
+        flash(f'Payment received for {len(delegates)} delegate(s). Total: KSh {total_amount:,.0f}. {tickets_issued} ticket(s) issued.', 'success')
         return redirect(url_for('payments.finance_payment_dashboard'))
     
     return render_template('payments/receive_payment.html',
         unpaid_by_chair=unpaid_by_chair,
-        delegate_fee=delegate_fee
+        delegate_fee=delegate_fee,
+        pending_approval_count=pending_approval_count
     )
 
 

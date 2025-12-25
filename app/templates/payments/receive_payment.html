@@ -9,11 +9,26 @@
         <a href="{{ url_for('payments.finance_payment_dashboard') }}" class="btn btn-outline-secondary me-3">
             <i class="bi bi-arrow-left"></i>
         </a>
-        <div>
+        <div class="flex-grow-1">
             <h2 class="mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>Receive Payment</h2>
-            <p class="text-muted mb-0">Record cash/manual payments from chairs (KSh {{ "{:,}".format(delegate_fee) }} per delegate)</p>
+            <p class="text-muted mb-0">Record cash/manual payments directly from chairs</p>
         </div>
     </div>
+
+    {% if pending_approval_count > 0 %}
+    <div class="alert alert-info mb-4">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-hourglass-split me-3" style="font-size: 1.5rem;"></i>
+            <div class="flex-grow-1">
+                <strong>{{ pending_approval_count }} payment(s) awaiting your approval</strong>
+                <p class="mb-0 small">Chairs have submitted cash payments that need your approval before delegates are marked as paid.</p>
+            </div>
+            <a href="{{ url_for('finance.payment_approvals') }}" class="btn btn-info btn-sm ms-3">
+                <i class="bi bi-check-circle me-1"></i>Review Approvals
+            </a>
+        </div>
+    </div>
+    {% endif %}
 
     {% if unpaid_by_chair %}
     <form method="POST" id="receivePaymentForm">
@@ -60,6 +75,7 @@
                                                 <th>Name</th>
                                                 <th>Phone</th>
                                                 <th>Category</th>
+                                                <th class="text-end">Fee</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -68,11 +84,12 @@
                                                 <td>
                                                     <input type="checkbox" class="form-check-input delegate-checkbox" 
                                                            name="delegate_ids" value="{{ delegate.id }}"
-                                                           data-chair="{{ chair.id }}" data-fee="{{ delegate_fee }}">
+                                                           data-chair="{{ chair.id }}" data-fee="{{ delegate.get_registration_fee() }}">
                                                 </td>
                                                 <td><strong>{{ delegate.name }}</strong></td>
                                                 <td><small>{{ delegate.phone_number or 'N/A' }}</small></td>
                                                 <td><span class="badge bg-secondary">{{ delegate.category or 'Delegate' }}</span></td>
+                                                <td class="text-end">KSh {{ "{:,}".format(delegate.get_registration_fee()) }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
@@ -96,10 +113,6 @@
                             <div class="d-flex justify-content-between mb-2">
                                 <span>Selected Delegates:</span>
                                 <strong id="selectedCount">0</strong>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Rate per Delegate:</span>
-                                <span>KSh {{ "{:,}".format(delegate_fee) }}</span>
                             </div>
                             <hr>
                             <div class="d-flex justify-content-between">
@@ -142,7 +155,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const delegateFee = {{ delegate_fee }};
     const checkboxes = document.querySelectorAll('.delegate-checkbox');
     const selectedCountEl = document.getElementById('selectedCount');
     const totalAmountEl = document.getElementById('totalAmount');
@@ -151,7 +163,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSummary() {
         const checked = document.querySelectorAll('.delegate-checkbox:checked');
         const count = checked.length;
-        const total = count * delegateFee;
+        let total = 0;
+        
+        checked.forEach(cb => {
+            total += parseInt(cb.dataset.fee) || 0;
+        });
         
         selectedCountEl.textContent = count;
         totalAmountEl.textContent = 'KSh ' + total.toLocaleString();
