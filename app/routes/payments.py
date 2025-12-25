@@ -256,10 +256,10 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
         
         if is_finance:
             flash(f'Cash payment of KSh {total_amount:,.2f} confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+            return redirect(url_for('payments.payment_page'))
         else:
             flash(f'Cash payment of KSh {total_amount:,.2f} submitted for {len(unpaid_delegates)} delegate(s). Awaiting Finance approval.', 'info')
-        
-        return redirect(url_for('payments.payment_status', payment_id=payment_id))
+            return redirect(url_for('payments.my_submissions'))
         
     except Exception as e:
         db.session.rollback()
