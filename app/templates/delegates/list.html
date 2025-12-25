@@ -70,6 +70,12 @@
                                 <a href="{{ url_for('delegates.view_ticket', id=delegate.id) }}" class="btn btn-sm btn-outline-primary" title="Ticket">
                                     <i class="bi bi-ticket-perforated"></i>
                                 </a>
+                                {% if delegate.phone_number %}
+                                <a href="https://wa.me/{{ delegate.phone_number | replace('+', '') | replace(' ', '') }}?text=Hello%20{{ delegate.name | urlencode }},%20KAYO%20Diocese%20of%20Nambale." 
+                                   target="_blank" class="btn btn-sm btn-success" title="WhatsApp">
+                                    <i class="bi bi-whatsapp"></i>
+                                </a>
+                                {% endif %}
                                 {% if not delegate.is_paid and current_user.role != 'viewer' %}
                                 <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-sm btn-outline-warning" title="Edit">
                                     <i class="bi bi-pencil"></i>

@@ -45,7 +45,23 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label text-muted small">Phone Number</label>
-                        <p class="fw-bold mb-0">{{ delegate.phone_number or 'Not provided' }}</p>
+                        <div class="d-flex align-items-center gap-2">
+                            <p class="fw-bold mb-0">{{ delegate.phone_number or 'Not provided' }}</p>
+                            {% if delegate.phone_number %}
+                            <div class="btn-group btn-group-sm">
+                                <a href="tel:{{ delegate.phone_number }}" class="btn btn-outline-secondary btn-sm" title="Call">
+                                    <i class="bi bi-telephone"></i>
+                                </a>
+                                <a href="https://wa.me/{{ delegate.phone_number | replace('+', '') | replace(' ', '') }}?text=Hello%20{{ delegate.name | urlencode }},%20this%20is%20from%20KAYO%20Diocese%20of%20Nambale." 
+                                   target="_blank" class="btn btn-success btn-sm" title="WhatsApp">
+                                    <i class="bi bi-whatsapp"></i>
+                                </a>
+                                <a href="sms:{{ delegate.phone_number }}" class="btn btn-outline-info btn-sm" title="SMS">
+                                    <i class="bi bi-chat-dots"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label text-muted small">ID Number</label>
@@ -113,6 +129,12 @@
                     {% if (can_edit is not defined or can_edit) and current_user.role != 'viewer' %}
                     <div>
                         {% if not delegate.is_paid %}
+                        {% if delegate.phone_number %}
+                        <a href="https://wa.me/{{ delegate.phone_number | replace('+', '') | replace(' ', '') }}?text=Hello%20{{ delegate.name | urlencode }},%20this%20is%20a%20friendly%20reminder%20about%20your%20pending%20registration%20payment%20of%20KES%201,500%20for%20the%20KAYO%20Delegates%20Conference.%20Please%20make%20your%20payment%20to%20complete%20your%20registration.%20Paybill:%20247247%20Account:%20KAYO%20Nambale.%20Thank%20you!" 
+                           target="_blank" class="btn btn-success" title="Send WhatsApp Payment Reminder">
+                            <i class="bi bi-whatsapp me-1"></i>Remind via WhatsApp
+                        </a>
+                        {% endif %}
                         <a href="{{ url_for('delegates.edit_delegate', id=delegate.id) }}" class="btn btn-primary">
                             <i class="bi bi-pencil me-2"></i>Edit
                         </a>

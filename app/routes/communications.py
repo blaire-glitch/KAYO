@@ -232,14 +232,17 @@ def payment_reminders():
     """View payment reminder history"""
     reminders = PaymentReminder.query.order_by(PaymentReminder.sent_at.desc()).all()
     
-    # Get unpaid delegates count
-    unpaid_count = Delegate.query.filter(
+    # Get unpaid delegates
+    unpaid_delegates = Delegate.query.filter(
         Delegate.payment_status.in_(['pending', 'partial'])
-    ).count()
+    ).order_by(Delegate.created_at.desc()).all()
+    
+    unpaid_count = len(unpaid_delegates)
     
     return render_template('communications/payment_reminders.html',
         reminders=reminders,
-        unpaid_count=unpaid_count
+        unpaid_count=unpaid_count,
+        unpaid_delegates=unpaid_delegates
     )
 
 
