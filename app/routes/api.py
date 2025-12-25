@@ -109,18 +109,18 @@ def activity_feed():
         # Get recent delegates (last 7 days)
         try:
             recent_delegates = Delegate.query.filter(
-                Delegate.created_at >= datetime.utcnow() - timedelta(days=7)
-            ).order_by(Delegate.created_at.desc()).limit(10).all()
+                Delegate.registered_at >= datetime.utcnow() - timedelta(days=7)
+            ).order_by(Delegate.registered_at.desc()).limit(10).all()
             
             for d in recent_delegates:
                 activities.append({
                     'type': 'registration',
                     'icon': 'bi-person-plus-fill',
                     'color': 'success',
-                    'title': f'{d.full_name} registered',
+                    'title': f'{d.name} registered',
                     'subtitle': f'{d.parish} • {d.archdeaconry}',
-                    'time': d.created_at.isoformat() if d.created_at else '',
-                    'time_ago': time_ago(d.created_at) if d.created_at else 'Unknown',
+                    'time': d.registered_at.isoformat() if d.registered_at else '',
+                    'time_ago': time_ago(d.registered_at) if d.registered_at else 'Unknown',
                     'url': f'/delegates/{d.id}'
                 })
         except Exception as e:
@@ -161,7 +161,7 @@ def activity_feed():
                     'type': 'checkin',
                     'icon': 'bi-check-circle-fill',
                     'color': 'info',
-                    'title': f'{c.delegate.full_name if c.delegate else "Unknown"} checked in',
+                    'title': f'{c.delegate.name if c.delegate else "Unknown"} checked in',
                     'subtitle': f'At {c.event.name if c.event else "Event"}',
                     'time': c.checked_in_at.isoformat() if c.checked_in_at else '',
                     'time_ago': time_ago(c.checked_in_at) if c.checked_in_at else 'Unknown',
