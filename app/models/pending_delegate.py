@@ -25,6 +25,7 @@ class PendingDelegate(db.Model):
     id_number = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(120), nullable=True)  # For notifications
     gender = db.Column(db.String(10), nullable=False)
+    age_bracket = db.Column(db.String(20), nullable=True)  # Age bracket
     category = db.Column(db.String(20), default='delegate')
     
     # Event (optional - for multi-event support)
@@ -71,6 +72,7 @@ class PendingDelegate(db.Model):
             'id_number': self.id_number,
             'email': self.email,
             'gender': self.gender,
+            'age_bracket': self.age_bracket,
             'category': self.category,
             'status': self.status,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,

@@ -824,6 +824,7 @@ def register_delegate(user):
             phone_number=data.get('phone_number'),
             id_number=data.get('id_number'),
             gender=data['gender'],
+            age_bracket=data.get('age_bracket'),
             category=data.get('category', 'delegate'),
             event_id=event.id,
             pricing_tier_id=data.get('pricing_tier_id'),
@@ -2391,6 +2392,7 @@ def public_register_delegate():
         id_number = data.get('id_number', '').strip() or None
         email = data.get('email', '').strip() or None
         gender = data.get('gender', '').strip()
+        age_bracket = data.get('age_bracket', '').strip() or None
         
         # Check for duplicate pending registrations
         if phone_number:
@@ -2436,6 +2438,7 @@ def public_register_delegate():
             id_number=id_number,
             email=email,
             gender=gender,
+            age_bracket=age_bracket,
             category='delegate',
             event_id=event.id if event else None,
             status='pending'

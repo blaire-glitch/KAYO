@@ -51,12 +51,22 @@
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.age_bracket.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.age_bracket(class="form-select") }}
+                            {% for error in form.age_bracket.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">{{ form.phone_number.label.text }}</label>
                             {{ form.phone_number(class="form-control", placeholder="e.g., 0712345678") }}
                             {% for error in form.phone_number.errors %}
                             <div class="text-danger small">{{ error }}</div>
                             {% endfor %}
                         </div>
+                    </div>
+                    
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ form.id_number.label.text }}</label>
                             {{ form.id_number(class="form-control", placeholder="National ID Number") }}
@@ -64,14 +74,13 @@
                             <div class="text-danger small">{{ error }}</div>
                             {% endfor %}
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">{{ form.category.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.category(class="form-select") }}
-                        {% for error in form.category.errors %}
-                        <div class="text-danger small">{{ error }}</div>
-                        {% endfor %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.category.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.category(class="form-select") }}
+                            {% for error in form.category.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
                     </div>
                     
                     <hr class="my-4">

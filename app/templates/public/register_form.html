@@ -199,12 +199,26 @@
                             
                             <div class="row">
                                 <div class="col-md-6 mb-3">
+                                    <label class="form-label">Age Bracket <span class="required-star">*</span></label>
+                                    <select class="form-select" name="age_bracket" required>
+                                        <option value="">Select Age Bracket</option>
+                                        <option value="15_below" {{ 'selected' if form_data.get('age_bracket') == '15_below' }}>15 and Below</option>
+                                        <option value="15_19" {{ 'selected' if form_data.get('age_bracket') == '15_19' }}>15-19</option>
+                                        <option value="20_24" {{ 'selected' if form_data.get('age_bracket') == '20_24' }}>20-24</option>
+                                        <option value="25_29" {{ 'selected' if form_data.get('age_bracket') == '25_29' }}>25-29</option>
+                                        <option value="30_above" {{ 'selected' if form_data.get('age_bracket') == '30_above' }}>30 and Above</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
                                     <label class="form-label">Phone Number</label>
                                     <input type="tel" class="form-control" name="phone_number" 
                                            value="{{ form_data.get('phone_number', '') }}"
                                            placeholder="e.g., 0712345678">
                                     <div class="form-text">For communication about your registration</div>
                                 </div>
+                            </div>
+                            
+                            <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">ID Number</label>
                                     <input type="text" class="form-control" name="id_number" 

@@ -91,6 +91,14 @@ class DelegateForm(FlaskForm):
         ('male', 'Male'),
         ('female', 'Female')
     ], validators=[DataRequired()])
+    age_bracket = SelectField('Age Bracket', choices=[
+        ('', '-- Select Age Bracket --'),
+        ('15_below', '15 and Below'),
+        ('15_19', '15-19'),
+        ('20_24', '20-24'),
+        ('25_29', '25-29'),
+        ('30_above', '30 and Above')
+    ], validators=[DataRequired()])
     category = SelectField('Category', choices=[
         ('delegate', 'Delegate'),
         ('counsellor', 'Counsellor'),

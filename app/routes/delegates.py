@@ -75,6 +75,7 @@ def register_delegate():
             phone_number=form.phone_number.data or None,
             id_number=form.id_number.data or None,
             gender=form.gender.data,
+            age_bracket=form.age_bracket.data or None,
             category=form.category.data,
             registered_by=current_user.id
         )

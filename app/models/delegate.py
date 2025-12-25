@@ -23,6 +23,15 @@ class Delegate(db.Model):
     # Categories with reduced fees (500 KSh instead of 1000 KSh)
     REDUCED_FEE_CATEGORIES = ['counsellor', 'intercessor']
     
+    # Age bracket choices
+    AGE_BRACKETS = [
+        ('15_below', '15 and Below'),
+        ('15_19', '15-19'),
+        ('20_24', '20-24'),
+        ('25_29', '25-29'),
+        ('30_above', '30 and Above')
+    ]
+    
     id = db.Column(db.Integer, primary_key=True)
     ticket_number = db.Column(db.String(20), unique=True, nullable=False)
     delegate_number = db.Column(db.Integer, nullable=True)  # Auto-assigned sequential number
@@ -33,6 +42,7 @@ class Delegate(db.Model):
     phone_number = db.Column(db.String(15), nullable=True)
     id_number = db.Column(db.String(20), nullable=True)  # National ID for duplicate detection
     gender = db.Column(db.String(10), nullable=False)  # male, female
+    age_bracket = db.Column(db.String(20), nullable=True)  # Age bracket: 15_below, 15_19, 20_24, 25_29, 30_above
     category = db.Column(db.String(20), default='delegate')  # delegate, leader, speaker, vip
     
     # Multi-event support
@@ -244,6 +254,19 @@ class Delegate(db.Model):
             Delegate.category,
             db.func.count(Delegate.id).label('count')
         ).group_by(Delegate.category).all()
+    
+    @staticmethod
+    def get_age_bracket_stats():
+        """Get delegate counts by age bracket"""
+        return db.session.query(
+            Delegate.age_bracket,
+            db.func.count(Delegate.id).label('count')
+        ).group_by(Delegate.age_bracket).all()
+    
+    def get_age_bracket_display(self):
+        """Get human-readable age bracket name"""
+        bracket_map = dict(self.AGE_BRACKETS)
+        return bracket_map.get(self.age_bracket, self.age_bracket or 'Not specified')
     
     @staticmethod
     def search(query):

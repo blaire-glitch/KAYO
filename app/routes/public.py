@@ -40,6 +40,7 @@ def register_delegate():
         id_number = request.form.get('id_number', '').strip()
         email = request.form.get('email', '').strip()
         gender = request.form.get('gender', '').strip()
+        age_bracket = request.form.get('age_bracket', '').strip()
         
         # Validation
         errors = []
@@ -53,6 +54,8 @@ def register_delegate():
             errors.append('Local church is required')
         if not gender:
             errors.append('Gender is required')
+        if not age_bracket:
+            errors.append('Age bracket is required')
         
         # Check for duplicate pending registrations
         if phone_number:
@@ -95,6 +98,7 @@ def register_delegate():
             id_number=id_number or None,
             email=email or None,
             gender=gender,
+            age_bracket=age_bracket or None,
             category='delegate',
             event_id=event.id if event else None,
             status='pending'
