@@ -422,16 +422,23 @@
     if (!countdownEl) return;
     
     const targetDate = new Date(countdownEl.dataset.target + 'T00:00:00');
+    const daysEl = document.getElementById('countdownDays');
+    const hoursEl = document.getElementById('countdownHours');
+    const minsEl = document.getElementById('countdownMins');
+    const secsEl = document.getElementById('countdownSecs');
+    
+    // Exit if any element is missing
+    if (!daysEl || !hoursEl || !minsEl || !secsEl) return;
     
     function updateCountdown() {
         const now = new Date();
         const diff = targetDate - now;
         
         if (diff <= 0) {
-            document.getElementById('countdownDays').textContent = '🎉';
-            document.getElementById('countdownHours').textContent = 'Event';
-            document.getElementById('countdownMins').textContent = 'Is';
-            document.getElementById('countdownSecs').textContent = 'Here!';
+            daysEl.textContent = '🎉';
+            hoursEl.textContent = 'Event';
+            minsEl.textContent = 'Is';
+            secsEl.textContent = 'Here!';
             return;
         }
         
@@ -440,10 +447,10 @@
         const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const secs = Math.floor((diff % (1000 * 60)) / 1000);
         
-        document.getElementById('countdownDays').textContent = days.toString().padStart(2, '0');
-        document.getElementById('countdownHours').textContent = hours.toString().padStart(2, '0');
-        document.getElementById('countdownMins').textContent = mins.toString().padStart(2, '0');
-        document.getElementById('countdownSecs').textContent = secs.toString().padStart(2, '0');
+        daysEl.textContent = days.toString().padStart(2, '0');
+        hoursEl.textContent = hours.toString().padStart(2, '0');
+        minsEl.textContent = mins.toString().padStart(2, '0');
+        secsEl.textContent = secs.toString().padStart(2, '0');
     }
     
     updateCountdown();
@@ -946,10 +953,14 @@
 <script>
 async function refreshActivityFeed() {
     const container = document.getElementById('activityFeedContainer');
+    // Guard: exit early if container doesn't exist on this page
+    if (!container) return;
+    
     container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
     
     try {
         const response = await fetch('/api/activity-feed');
+        if (!response.ok) throw new Error('Network response not ok');
         const data = await response.json();
         
         if (data.activities && data.activities.length > 0) {
@@ -980,6 +991,7 @@ async function refreshActivityFeed() {
             `;
         }
     } catch (error) {
+        console.log('Activity feed:', error.message);
         container.innerHTML = `
             <div class="text-center py-4">
                 <i class="bi bi-exclamation-circle text-warning" style="font-size: 2rem;"></i>
