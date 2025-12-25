@@ -378,8 +378,22 @@ def delete_user(id):
         # Handle permission requests - delete them
         PermissionRequest.query.filter_by(user_id=user.id).delete()
         
-        # Handle payments - reassign to admin
-        Payment.query.filter_by(user_id=user.id).update({'user_id': current_user.id})
+        # Handle payments - delete user's payments and unlink delegates
+        user_payments = Payment.query.filter_by(user_id=user.id).all()
+        payment_count = len(user_payments)
+        for payment in user_payments:
+            # Unlink delegates from this payment and reset their payment status
+            for delegate in payment.delegates.all():
+                delegate.payment_id = None
+                delegate.is_paid = False
+                delegate.amount_paid = 0
+                delegate.payment_confirmed_by = None
+                delegate.payment_confirmed_at = None
+            db.session.delete(payment)
+        
+        # Also handle payments where user confirmed as chair or approved as finance
+        Payment.query.filter_by(confirmed_by_chair_id=user.id).update({'confirmed_by_chair_id': None})
+        Payment.query.filter_by(approved_by_finance_id=user.id).update({'approved_by_finance_id': None})
         
         if delete_delegates and delegate_count > 0:
             # Delete all delegates registered by this user
@@ -397,9 +411,9 @@ def delete_user(id):
         db.session.commit()
         
         if delete_delegates:
-            flash(f'User "{user_name}" ({user_email}) and their {delegate_count} delegates deleted successfully.', 'success')
+            flash(f'User "{user_name}" ({user_email}), their {delegate_count} delegates, and {payment_count} payments deleted successfully.', 'success')
         else:
-            flash(f'User "{user_name}" ({user_email}) deleted successfully. {delegate_count} delegates were reassigned to you.', 'success')
+            flash(f'User "{user_name}" ({user_email}) and their {payment_count} payments deleted. {delegate_count} delegates were reassigned to you.', 'success')
             
     except Exception as e:
         db.session.rollback()
