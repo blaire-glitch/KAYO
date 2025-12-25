@@ -571,7 +571,7 @@
     </div>
     <div class="card-body p-0">
         <div class="leaderboard">
-            {% for stat in archdeaconry_stats|sort(attribute='total', reverse=true)[:5] %}
+            {% for stat in archdeaconry_stats|sort(attribute='total', reverse=true)|list|batch(5)|first %}
             {% set pct = (stat.paid / stat.total * 100) if stat.total > 0 else 0 %}
             {% set rank = loop.index %}
             <div class="leaderboard-item d-flex align-items-center p-3 {% if not loop.last %}border-bottom{% endif %}">
