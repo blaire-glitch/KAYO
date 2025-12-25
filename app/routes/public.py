@@ -16,6 +16,13 @@ from app.church_data import CHURCH_DATA
 public_bp = Blueprint('public', __name__, url_prefix='/register')
 
 
+@public_bp.route('/conference-program')
+def conference_program():
+    """Public conference program and schedule page"""
+    event = Event.query.filter_by(is_active=True).first()
+    return render_template('public/conference_program.html', event=event)
+
+
 @public_bp.route('/')
 def register_landing():
     """Landing page for public delegate registration"""
