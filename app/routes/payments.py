@@ -364,9 +364,16 @@ def confirm_cash_payment():
     delegate_fee = current_app.config.get('DELEGATE_FEE', 500)
     
     # Get all unpaid delegates (excluding fee-exempt)
-    # For chairs, filter by their parish
+    # For chairs, show delegates they registered OR delegates in their parish
     if current_user.role == 'chair':
-        all_unpaid = Delegate.query.filter_by(is_paid=False, parish=current_user.parish).order_by(
+        from sqlalchemy import or_
+        all_unpaid = Delegate.query.filter(
+            Delegate.is_paid == False,
+            or_(
+                Delegate.registered_by == current_user.id,
+                Delegate.parish == current_user.parish
+            )
+        ).order_by(
             Delegate.archdeaconry, Delegate.parish, Delegate.name
         ).all()
     else:
