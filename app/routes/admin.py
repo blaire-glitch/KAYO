@@ -1,6 +1,6 @@
 from functools import wraps
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, current_app, jsonify
 from flask_login import login_required, current_user
 from app import db
@@ -10,8 +10,9 @@ from app.models.payment import Payment
 from app.models.operations import CheckInRecord
 from app.models.fund_management import Pledge, ScheduledPayment, FundTransfer, FundTransferApproval, PaymentSummary
 from app.models.permission_request import PermissionRequest
+from app.models.audit import AuditLog
 from app.forms import AdminUserForm, SearchForm, CheckInForm
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -922,3 +923,152 @@ def reject_user(user_id):
     
     flash(f'User {user.name} registration has been rejected.', 'info')
     return redirect(url_for('admin.pending_approvals'))
+
+
+@admin_bp.route('/audit-log')
+@login_required
+@admin_required
+def audit_log():
+    """View system audit log"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Filter parameters
+    action = request.args.get('action', '')
+    resource_type = request.args.get('resource_type', '')
+    user_id = request.args.get('user_id', '', type=int)
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    # Build query
+    query = AuditLog.query
+    
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if user_id:
+        query = query.filter(AuditLog.user_id == user_id)
+    if date_from:
+        try:
+            date_from_dt = datetime.strptime(date_from, '%Y-%m-%d')
+            query = query.filter(AuditLog.created_at >= date_from_dt)
+        except:
+            pass
+    if date_to:
+        try:
+            date_to_dt = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(AuditLog.created_at < date_to_dt)
+        except:
+            pass
+    
+    logs = query.order_by(AuditLog.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Get unique values for filters
+    actions = db.session.query(AuditLog.action).distinct().all()
+    resource_types = db.session.query(AuditLog.resource_type).distinct().all()
+    users = User.query.all()
+    
+    return render_template('admin/audit_log.html',
+        logs=logs,
+        actions=[a[0] for a in actions if a[0]],
+        resource_types=[r[0] for r in resource_types if r[0]],
+        users=users,
+        filters={
+            'action': action,
+            'resource_type': resource_type,
+            'user_id': user_id,
+            'date_from': date_from,
+            'date_to': date_to
+        }
+    )
+
+
+@admin_bp.route('/charts')
+@login_required
+@admin_required
+def charts_dashboard():
+    """View analytics charts and graphs"""
+    # Get date range (default: last 30 days)
+    days = request.args.get('days', 30, type=int)
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Daily registrations
+    daily_registrations = db.session.query(
+        func.date(Delegate.registered_at).label('date'),
+        func.count(Delegate.id).label('count')
+    ).filter(Delegate.registered_at >= start_date).group_by(
+        func.date(Delegate.registered_at)
+    ).order_by('date').all()
+    
+    # Daily payments
+    daily_payments = db.session.query(
+        func.date(Payment.completed_at).label('date'),
+        func.sum(Payment.amount).label('amount'),
+        func.count(Payment.id).label('count')
+    ).filter(
+        Payment.status == 'completed',
+        Payment.completed_at >= start_date
+    ).group_by(
+        func.date(Payment.completed_at)
+    ).order_by('date').all()
+    
+    # Registrations by archdeaconry
+    by_archdeaconry = db.session.query(
+        Delegate.archdeaconry,
+        func.count(Delegate.id).label('count')
+    ).group_by(Delegate.archdeaconry).all()
+    
+    # Payment status breakdown
+    payment_status = {
+        'paid': Delegate.query.filter_by(is_paid=True).count(),
+        'unpaid': Delegate.query.filter_by(is_paid=False).count()
+    }
+    
+    # Gender breakdown
+    gender_breakdown = db.session.query(
+        Delegate.gender,
+        func.count(Delegate.id).label('count')
+    ).group_by(Delegate.gender).all()
+    
+    # Category breakdown
+    category_breakdown = db.session.query(
+        Delegate.category,
+        func.count(Delegate.id).label('count')
+    ).group_by(Delegate.category).all()
+    
+    # Age bracket breakdown
+    age_bracket_breakdown = db.session.query(
+        Delegate.age_bracket,
+        func.count(Delegate.id).label('count')
+    ).group_by(Delegate.age_bracket).all()
+    
+    # Check-in progress over time
+    checkin_progress = db.session.query(
+        func.date(CheckInRecord.check_in_time).label('date'),
+        func.count(CheckInRecord.id).label('count')
+    ).filter(CheckInRecord.check_in_time >= start_date).group_by(
+        func.date(CheckInRecord.check_in_time)
+    ).order_by('date').all()
+    
+    # Payment methods breakdown
+    payment_methods = db.session.query(
+        Payment.payment_method,
+        func.count(Payment.id).label('count'),
+        func.sum(Payment.amount).label('amount')
+    ).filter(Payment.status == 'completed').group_by(Payment.payment_method).all()
+    
+    return render_template('admin/charts.html',
+        daily_registrations=[{'date': str(r.date), 'count': r.count} for r in daily_registrations],
+        daily_payments=[{'date': str(p.date), 'amount': float(p.amount or 0), 'count': p.count} for p in daily_payments],
+        by_archdeaconry=[{'name': a.archdeaconry or 'Unknown', 'count': a.count} for a in by_archdeaconry],
+        payment_status=payment_status,
+        gender_breakdown=[{'gender': g.gender or 'Unknown', 'count': g.count} for g in gender_breakdown],
+        category_breakdown=[{'category': c.category or 'Unknown', 'count': c.count} for c in category_breakdown],
+        age_bracket_breakdown=[{'bracket': a.age_bracket or 'Unknown', 'count': a.count} for a in age_bracket_breakdown],
+        checkin_progress=[{'date': str(c.date), 'count': c.count} for c in checkin_progress],
+        payment_methods=[{'method': p.payment_method or 'Unknown', 'count': p.count, 'amount': float(p.amount or 0)} for p in payment_methods],
+        days=days
+    )

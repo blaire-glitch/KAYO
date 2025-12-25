@@ -747,6 +747,20 @@
                         </li>
                         
                         <li><hr class="my-2" style="border-color: rgba(255,255,255,0.1);"></li>
+                        <li class="px-3"><small class="text-white-50 text-uppercase" style="font-size: 0.7rem;">Analytics & Audit</small></li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'admin.charts_dashboard' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.charts_dashboard') }}">
+                                <i class="bi bi-graph-up"></i>Charts Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'admin.audit_log' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.audit_log') }}">
+                                <i class="bi bi-clock-history"></i>Audit Log
+                            </a>
+                        </li>
+                        
+                        <li><hr class="my-2" style="border-color: rgba(255,255,255,0.1);"></li>
                         <li class="px-3"><small class="text-white-50 text-uppercase" style="font-size: 0.7rem;">Fund Management</small></li>
                         
                         <li class="nav-item">

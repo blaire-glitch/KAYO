@@ -128,6 +128,12 @@
         <p class="text-muted mb-0 small">Overview of all registrations and payments</p>
     </div>
     <div class="btn-group">
+        <a href="{{ url_for('admin.charts_dashboard') }}" class="btn btn-outline-info" title="Charts">
+            <i class="bi bi-graph-up me-1"></i>Charts
+        </a>
+        <a href="{{ url_for('admin.audit_log') }}" class="btn btn-outline-secondary" title="Audit Log">
+            <i class="bi bi-clock-history me-1"></i>Audit
+        </a>
         <a href="{{ url_for('admin.search') }}" class="btn btn-outline-primary">
             <i class="bi bi-search me-1"></i>Search
         </a>
