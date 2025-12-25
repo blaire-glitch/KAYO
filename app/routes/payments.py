@@ -162,8 +162,23 @@ def initiate_mpesa_payment(form, unpaid_delegates, total_amount, delegate_fee):
 
 
 def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
-    """Handle cash payment confirmation"""
+    """Handle cash payment confirmation - sets status to pending finance approval for chairs"""
     try:
+        # Determine if this is a chair submitting (needs finance approval) or finance directly confirming
+        is_chair = current_user.role == 'chair'
+        is_finance = current_user.role in ['finance', 'treasurer', 'admin', 'super_admin']
+        
+        # Set finance status based on who is confirming
+        if is_finance:
+            finance_status = 'approved'
+            payment_status = 'completed'
+            completed_at = datetime.utcnow()
+        else:
+            # Chair confirmation - needs finance approval
+            finance_status = 'pending_approval'
+            payment_status = 'pending'
+            completed_at = None
+        
         # Create payment record
         payment = Payment(
             user_id=current_user.id,
@@ -171,8 +186,13 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
             payment_mode='Cash',
             mpesa_receipt_number=form.receipt_number.data or f"CASH-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
             delegates_count=len(unpaid_delegates),
-            status='completed',
-            completed_at=datetime.utcnow()
+            status=payment_status,
+            finance_status=finance_status,
+            confirmed_by_chair_id=current_user.id if is_chair else None,
+            confirmed_by_chair_at=datetime.utcnow() if is_chair else None,
+            approved_by_finance_id=current_user.id if is_finance else None,
+            approved_by_finance_at=datetime.utcnow() if is_finance else None,
+            completed_at=completed_at
         )
         db.session.add(payment)
         db.session.flush()  # Get the payment.id without committing
@@ -181,7 +201,7 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
         delegate_ids = [d.id for d in unpaid_delegates]
         now = datetime.utcnow()
         
-        current_app.logger.info(f'Recording cash payment for delegates: {delegate_ids}')
+        current_app.logger.info(f'Recording cash payment for delegates: {delegate_ids}, finance_status: {finance_status}')
         
         # Use direct UPDATE query to ensure changes are persisted
         tickets_issued = 0
@@ -189,23 +209,26 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
             # Get the correct fee for this delegate
             delegate_specific_fee = delegate.get_registration_fee()
             
-            # Generate ticket number if not already assigned
-            new_ticket = None
-            if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
-                event = Event.query.get(delegate.event_id) if delegate.event_id else None
-                new_ticket = Delegate.generate_ticket_number(event)
-                tickets_issued += 1
-            
-            # Direct UPDATE query
+            # Link delegate to payment but only mark as paid if finance approved
             update_data = {
                 'payment_id': payment_id,
-                'is_paid': True,
                 'amount_paid': delegate_specific_fee,
-                'payment_confirmed_by': current_user.id,
-                'payment_confirmed_at': now
             }
-            if new_ticket:
-                update_data['ticket_number'] = new_ticket
+            
+            # Only mark as fully paid and issue tickets if finance has approved
+            if is_finance:
+                # Generate ticket number if not already assigned
+                new_ticket = None
+                if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                    event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                    new_ticket = Delegate.generate_ticket_number(event)
+                    tickets_issued += 1
+                
+                update_data['is_paid'] = True
+                update_data['payment_confirmed_by'] = current_user.id
+                update_data['payment_confirmed_at'] = now
+                if new_ticket:
+                    update_data['ticket_number'] = new_ticket
             
             db.session.query(Delegate).filter(Delegate.id == delegate.id).update(update_data)
         
@@ -213,9 +236,13 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
         
         # Verify the update worked
         updated_delegate = Delegate.query.get(delegate_ids[0])
-        current_app.logger.info(f'Cash payment recorded: {payment_id}, Verification - delegate {updated_delegate.id} is_paid: {updated_delegate.is_paid}')
+        current_app.logger.info(f'Cash payment recorded: {payment_id}, finance_status: {finance_status}')
         
-        flash(f'Cash payment of KSh {total_amount:,.2f} confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+        if is_finance:
+            flash(f'Cash payment of KSh {total_amount:,.2f} confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+        else:
+            flash(f'Cash payment of KSh {total_amount:,.2f} submitted for {len(unpaid_delegates)} delegate(s). Awaiting Finance approval.', 'info')
+        
         return redirect(url_for('payments.payment_status', payment_id=payment_id))
         
     except Exception as e:
@@ -228,9 +255,24 @@ def record_cash_payment(form, unpaid_delegates, total_amount, delegate_fee):
 
 
 def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, payment_method):
-    """Handle manual payment verification (paybill/bank transfer)"""
+    """Handle manual payment verification (paybill/bank transfer) - needs finance approval for chairs"""
     try:
         payment_mode = 'M-Pesa Paybill' if payment_method == 'mpesa_paybill' else 'Bank Transfer'
+        
+        # Determine if this is a chair submitting (needs finance approval) or finance directly confirming
+        is_chair = current_user.role == 'chair'
+        is_finance = current_user.role in ['finance', 'treasurer', 'admin', 'super_admin']
+        
+        # Set finance status based on who is confirming
+        if is_finance:
+            finance_status = 'approved'
+            payment_status = 'completed'
+            completed_at = datetime.utcnow()
+        else:
+            # Chair confirmation - needs finance approval
+            finance_status = 'pending_approval'
+            payment_status = 'pending'
+            completed_at = None
         
         # Create payment record
         payment = Payment(
@@ -240,8 +282,13 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
             mpesa_receipt_number=form.receipt_number.data,
             phone_number=form.phone_number.data,
             delegates_count=len(unpaid_delegates),
-            status='completed',
-            completed_at=datetime.utcnow()
+            status=payment_status,
+            finance_status=finance_status,
+            confirmed_by_chair_id=current_user.id if is_chair else None,
+            confirmed_by_chair_at=datetime.utcnow() if is_chair else None,
+            approved_by_finance_id=current_user.id if is_finance else None,
+            approved_by_finance_at=datetime.utcnow() if is_finance else None,
+            completed_at=completed_at
         )
         db.session.add(payment)
         db.session.flush()  # Get the payment.id without committing
@@ -250,7 +297,7 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
         delegate_ids = [d.id for d in unpaid_delegates]
         now = datetime.utcnow()
         
-        current_app.logger.info(f'Recording {payment_mode} payment for delegates: {delegate_ids}')
+        current_app.logger.info(f'Recording {payment_mode} payment for delegates: {delegate_ids}, finance_status: {finance_status}')
         
         # Use direct UPDATE query to ensure changes are persisted
         tickets_issued = 0
@@ -258,23 +305,26 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
             # Get the correct fee for this delegate
             delegate_specific_fee = delegate.get_registration_fee()
             
-            # Generate ticket number if not already assigned
-            new_ticket = None
-            if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
-                event = Event.query.get(delegate.event_id) if delegate.event_id else None
-                new_ticket = Delegate.generate_ticket_number(event)
-                tickets_issued += 1
-            
-            # Direct UPDATE query
+            # Link delegate to payment
             update_data = {
                 'payment_id': payment_id,
-                'is_paid': True,
                 'amount_paid': delegate_specific_fee,
-                'payment_confirmed_by': current_user.id,
-                'payment_confirmed_at': now
             }
-            if new_ticket:
-                update_data['ticket_number'] = new_ticket
+            
+            # Only mark as fully paid and issue tickets if finance has approved
+            if is_finance:
+                # Generate ticket number if not already assigned
+                new_ticket = None
+                if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                    event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                    new_ticket = Delegate.generate_ticket_number(event)
+                    tickets_issued += 1
+                
+                update_data['is_paid'] = True
+                update_data['payment_confirmed_by'] = current_user.id
+                update_data['payment_confirmed_at'] = now
+                if new_ticket:
+                    update_data['ticket_number'] = new_ticket
             
             db.session.query(Delegate).filter(Delegate.id == delegate.id).update(update_data)
         
@@ -282,9 +332,13 @@ def record_manual_payment(form, unpaid_delegates, total_amount, delegate_fee, pa
         
         # Verify the update worked
         updated_delegate = Delegate.query.get(delegate_ids[0])
-        current_app.logger.info(f'{payment_mode} payment recorded: {payment_id}, Verification - delegate {updated_delegate.id} is_paid: {updated_delegate.is_paid}')
+        current_app.logger.info(f'{payment_mode} payment recorded: {payment_id}, finance_status: {finance_status}')
         
-        flash(f'{payment_mode} payment confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+        if is_finance:
+            flash(f'{payment_mode} payment confirmed for {len(unpaid_delegates)} delegate(s). {tickets_issued} ticket(s) issued.', 'success')
+        else:
+            flash(f'{payment_mode} payment submitted for {len(unpaid_delegates)} delegate(s). Awaiting Finance approval.', 'info')
+        
         return redirect(url_for('payments.payment_status', payment_id=payment_id))
         
     except Exception as e:
@@ -570,6 +624,39 @@ def delete_payment(payment_id):
     
     flash('Payment record deleted.', 'success')
     return redirect(url_for('payments.payment_history'))
+
+
+# ==================== CHAIR SUBMITTED PAYMENTS ====================
+
+@payments_bp.route('/my-submissions')
+@login_required
+def my_submissions():
+    """Show payments submitted by chair for finance approval"""
+    # This route is for chairs to track their submitted payments
+    if current_user.role not in ['chair', 'admin', 'super_admin']:
+        flash('This page is for parish chairs only.', 'warning')
+        return redirect(url_for('main.dashboard'))
+    
+    # Get payments submitted by this chair
+    submitted_payments = Payment.query.filter(
+        Payment.confirmed_by_chair_id == current_user.id
+    ).order_by(Payment.created_at.desc()).all()
+    
+    # Separate by status
+    pending = [p for p in submitted_payments if p.finance_status == 'pending_approval']
+    approved = [p for p in submitted_payments if p.finance_status == 'approved']
+    rejected = [p for p in submitted_payments if p.finance_status == 'rejected']
+    
+    # Calculate totals
+    total_pending = sum(p.amount for p in pending)
+    total_approved = sum(p.amount for p in approved)
+    
+    return render_template('payments/my_submissions.html',
+                         pending=pending,
+                         approved=approved,
+                         rejected=rejected,
+                         total_pending=total_pending,
+                         total_approved=total_approved)
 
 
 # ==================== FINANCE PAYMENT MANAGEMENT ====================

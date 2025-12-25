@@ -53,6 +53,11 @@ def dashboard():
     pending_vouchers = Voucher.query.filter_by(status='pending_approval').count()
     draft_vouchers = Voucher.query.filter_by(status='draft').count()
     
+    # Get pending payment approvals count
+    pending_payment_approvals = Payment.query.filter(
+        Payment.finance_status == 'pending_approval'
+    ).count()
+    
     # Recent transactions
     recent_vouchers = Voucher.query.order_by(Voucher.created_at.desc()).limit(5).all()
     recent_journals = JournalEntry.query.order_by(JournalEntry.created_at.desc()).limit(5).all()
@@ -78,6 +83,7 @@ def dashboard():
         collection_rate=collection_rate,
         pending_vouchers=pending_vouchers,
         draft_vouchers=draft_vouchers,
+        pending_payment_approvals=pending_payment_approvals,
         recent_vouchers=recent_vouchers,
         recent_journals=recent_journals,
         summaries=summaries,
@@ -947,6 +953,151 @@ def initialize_accounts():
         {'code': '2010', 'name': 'Accrued Expenses', 'account_type': 'liability', 'normal_balance': 'credit'},
         {'code': '2020', 'name': 'Deposits Received', 'account_type': 'liability', 'normal_balance': 'credit'},
         
+# ==================== PAYMENT APPROVALS ====================
+
+@finance_bp.route('/payment-approvals')
+@login_required
+@require_finance_role
+def payment_approvals():
+    """List payments pending finance approval"""
+    from app.models.user import User
+    
+    # Get pending payments
+    pending_payments = Payment.query.filter(
+        Payment.finance_status == 'pending_approval'
+    ).order_by(Payment.created_at.desc()).all()
+    
+    # Calculate totals
+    total_pending = sum(p.amount for p in pending_payments)
+    
+    return render_template('finance/payment_approvals.html',
+                         pending_payments=pending_payments,
+                         total_pending=total_pending)
+
+
+@finance_bp.route('/payment/<int:payment_id>/approve', methods=['POST'])
+@login_required
+@require_finance_role
+def approve_payment(payment_id):
+    """Approve a payment submitted by chair"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    if payment.finance_status != 'pending_approval':
+        flash('This payment is not pending approval.', 'warning')
+        return redirect(url_for('finance.payment_approvals'))
+    
+    notes = request.form.get('notes', '')
+    
+    try:
+        # Approve the payment
+        payment.approve_by_finance(current_user.id, notes)
+        
+        # Mark all associated delegates as paid and issue tickets
+        for delegate in payment.delegates:
+            delegate.has_paid = True
+            delegate.payment_date = datetime.utcnow()
+            if not delegate.ticket_number:
+                delegate.issue_ticket()
+        
+        db.session.commit()
+        
+        flash(f'Payment of KES {payment.amount:,.2f} approved successfully. {len(payment.delegates)} delegate(s) marked as paid.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error approving payment: {str(e)}', 'danger')
+    
+    return redirect(url_for('finance.payment_approvals'))
+
+
+@finance_bp.route('/payment/<int:payment_id>/reject', methods=['POST'])
+@login_required
+@require_finance_role
+def reject_payment(payment_id):
+    """Reject a payment submitted by chair"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    if payment.finance_status != 'pending_approval':
+        flash('This payment is not pending approval.', 'warning')
+        return redirect(url_for('finance.payment_approvals'))
+    
+    reason = request.form.get('reason', 'No reason provided')
+    
+    try:
+        # Reject the payment
+        payment.reject_by_finance(current_user.id, reason)
+        
+        # Unlink delegates from this payment (they remain unpaid)
+        for delegate in payment.delegates:
+            delegate.payment_id = None
+        
+        db.session.commit()
+        
+        flash(f'Payment of KES {payment.amount:,.2f} rejected. Chair has been notified.', 'info')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error rejecting payment: {str(e)}', 'danger')
+    
+    return redirect(url_for('finance.payment_approvals'))
+
+
+@finance_bp.route('/payment/<int:payment_id>/details')
+@login_required
+@require_finance_role
+def payment_details(payment_id):
+    """View payment details for approval"""
+    from app.models.user import User
+    
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Get chair info
+    chair = User.query.get(payment.confirmed_by_chair_id) if payment.confirmed_by_chair_id else None
+    
+    return render_template('finance/payment_details.html',
+                         payment=payment,
+                         chair=chair)
+
+
+@finance_bp.route('/approved-payments')
+@login_required
+@require_finance_role
+def approved_payments():
+    """List approved payments"""
+    # Get filter parameters
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    
+    query = Payment.query.filter(Payment.finance_status == 'approved')
+    
+    if date_from:
+        query = query.filter(Payment.approved_by_finance_at >= datetime.strptime(date_from, '%Y-%m-%d'))
+    if date_to:
+        query = query.filter(Payment.approved_by_finance_at <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+    
+    payments = query.order_by(Payment.approved_by_finance_at.desc()).all()
+    total_approved = sum(p.amount for p in payments)
+    
+    return render_template('finance/approved_payments.html',
+                         payments=payments,
+                         total_approved=total_approved)
+
+
+@finance_bp.route('/rejected-payments')
+@login_required
+@require_finance_role
+def rejected_payments():
+    """List rejected payments"""
+    payments = Payment.query.filter(
+        Payment.finance_status == 'rejected'
+    ).order_by(Payment.created_at.desc()).all()
+    
+    return render_template('finance/rejected_payments.html',
+                         payments=payments)
+
+
+# ==================== CHART OF ACCOUNTS INITIALIZATION ====================
+
         # Equity
         {'code': '3001', 'name': 'Opening Balance Equity', 'account_type': 'equity', 'normal_balance': 'credit'},
         {'code': '3010', 'name': 'Retained Earnings', 'account_type': 'equity', 'normal_balance': 'credit'},
