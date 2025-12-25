@@ -628,6 +628,16 @@
 </div>
 {% endif %}
 
+{% if pending_approval is defined and pending_approval > 0 and current_user.role != 'viewer' %}
+<div class="alert alert-info d-flex align-items-center" role="alert">
+    <i class="bi bi-hourglass-split me-3" style="font-size: 1.5rem;"></i>
+    <div>
+        <strong>Pending Approval:</strong> {{ pending_approval }} delegate(s) awaiting Finance approval.
+        <a href="{{ url_for('payments.my_submissions') }}" class="btn btn-info btn-sm ms-3">View Status</a>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <!-- Recent Delegates -->
     <div class="col-lg-8 mb-4">

@@ -128,13 +128,18 @@ def dashboard():
     # Calculate stats
     total_delegates = len(delegates)
     paid_delegates = sum(1 for d in delegates if d.is_paid)
-    unpaid_delegates = total_delegates - paid_delegates
+    # Truly unpaid = not paid AND not linked to any payment (including pending)
+    truly_unpaid = sum(1 for d in delegates if not d.is_paid and d.payment_id is None)
+    # Pending approval = not paid but has a payment_id (awaiting finance approval)
+    pending_approval = sum(1 for d in delegates if not d.is_paid and d.payment_id is not None)
+    unpaid_delegates = truly_unpaid  # Only show truly unpaid in the "Pay Now" notification
     
     return render_template('dashboard.html',
         delegates=delegates,
         total_delegates=total_delegates,
         paid_delegates=paid_delegates,
         unpaid_delegates=unpaid_delegates,
+        pending_approval=pending_approval,
         payments=payments,
         is_dyo=False
     )
