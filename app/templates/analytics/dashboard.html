@@ -364,8 +364,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // Registration Trend Chart
-    const trendData = {{ registration_trend|tojson }};
-    new Chart(document.getElementById('registrationTrendChart'), {
+    const trendData = {{ (registration_trend if registration_trend else {'daily': [], 'cumulative': []})|tojson }};
+    const trendChart = document.getElementById('registrationTrendChart');
+    if (trendChart && trendData.daily && trendData.daily.length > 0) {
+    new Chart(trendChart, {
         type: 'line',
         data: {
             labels: trendData.daily.map(d => d.date),
@@ -398,9 +400,10 @@
             }
         }
     });
+    }
 
     // Hourly Distribution Chart
-    const hourlyData = {{ payment_behavior.hourly|tojson }};
+    const hourlyData = {{ (payment_behavior.hourly if payment_behavior and payment_behavior.hourly else {})|tojson }};
     new Chart(document.getElementById('hourlyChart'), {
         type: 'bar',
         data: {
@@ -422,7 +425,7 @@
     });
 
     // Gender Chart
-    const genderData = {{ demographics.gender|tojson }};
+    const genderData = {{ (demographics.gender if demographics and demographics.gender else [])|tojson }};
     new Chart(document.getElementById('genderChart'), {
         type: 'doughnut',
         data: {
@@ -440,7 +443,7 @@
     });
 
     // Age Distribution Chart
-    const ageData = {{ demographics.age_brackets|tojson }};
+    const ageData = {{ (demographics.age_brackets if demographics and demographics.age_brackets else [])|tojson }};
     new Chart(document.getElementById('ageChart'), {
         type: 'bar',
         data: {
@@ -474,7 +477,8 @@
     });
 
     // Category Chart
-    const categoryData = {{ demographics.categories|tojson }};
+    const categoryData = {{ (demographics.categories if demographics and demographics.categories else [])|tojson }};
+    if (categoryData.length > 0) {
     new Chart(document.getElementById('categoryChart'), {
         type: 'pie',
         data: {
@@ -490,15 +494,16 @@
             plugins: { legend: { position: 'bottom' } }
         }
     });
+    }
 
     // Payment Status Chart
-    const statusData = {{ payment_behavior.status_breakdown|tojson }};
+    const statusData = {{ (payment_behavior.status_breakdown if payment_behavior and payment_behavior.status_breakdown else {'paid': 0, 'partial': 0, 'pending': 0})|tojson }};
     new Chart(document.getElementById('paymentStatusChart'), {
         type: 'doughnut',
         data: {
             labels: ['Paid', 'Partial', 'Pending'],
             datasets: [{
-                data: [statusData.paid, statusData.partial, statusData.pending],
+                data: [statusData.paid || 0, statusData.partial || 0, statusData.pending || 0],
                 backgroundColor: ['#28a745', '#ffc107', '#dc3545']
             }]
         },
@@ -510,7 +515,7 @@
     });
 
     // Daily Distribution Chart
-    const dailyData = {{ payment_behavior.daily|tojson }};
+    const dailyData = {{ (payment_behavior.daily if payment_behavior and payment_behavior.daily else {})|tojson }};
     new Chart(document.getElementById('dailyChart'), {
         type: 'bar',
         data: {
