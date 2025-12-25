@@ -71,7 +71,7 @@ def global_search():
                 'icon': 'bi-cash-coin',
                 'title': f'KES {p.amount:,.0f} - {p.transaction_code or "No code"}',
                 'subtitle': f'{payer} • {p.payment_date.strftime("%d %b %Y")}',
-                'url': '/finance/dashboard',
+                'url': '/finance/',
                 'badge': p.status
             })
     
@@ -140,7 +140,7 @@ def activity_feed():
                 'subtitle': f'From {payer} • {p.transaction_code or "Manual"}',
                 'time': p.payment_date.isoformat(),
                 'time_ago': time_ago(p.payment_date),
-                'url': '/finance/dashboard'
+                'url': '/finance/'
             })
     
     # Get recent check-ins (last 7 days)
@@ -263,7 +263,7 @@ def get_notifications():
                 'icon': 'bi-cash-coin',
                 'title': f'{pending_payments} Payment(s) Pending',
                 'message': 'Payments awaiting verification',
-                'url': '/finance/dashboard',
+                'url': '/finance/',
                 'time': 'Action needed'
             })
     
