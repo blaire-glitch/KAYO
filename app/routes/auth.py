@@ -24,6 +24,7 @@ def create_user_session(user, token):
         db.session.commit()
     except Exception as e:
         current_app.logger.error(f"Failed to create session record: {e}")
+        db.session.rollback()
 
 
 # ==================== STANDARD AUTH ====================
@@ -232,16 +233,20 @@ def register():
 @auth_bp.route('/logout')
 @login_required
 def logout():
-    # Mark session as inactive
-    token = session.get('session_token')
-    if token:
-        session_record = UserSession.query.filter_by(
-            session_token=token,
-            user_id=current_user.id
-        ).first()
-        if session_record:
-            session_record.is_active = False
-            db.session.commit()
+    # Mark session as inactive (with error handling)
+    try:
+        token = session.get('session_token')
+        if token:
+            session_record = UserSession.query.filter_by(
+                session_token=token,
+                user_id=current_user.id
+            ).first()
+            if session_record:
+                session_record.is_active = False
+                db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"Error deactivating session: {e}")
+        db.session.rollback()
     
     logout_user()
     flash('You have been logged out.', 'info')
