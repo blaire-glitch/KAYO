@@ -911,48 +911,6 @@ def export_accounts():
     )
 
 
-# ==================== INITIALIZE DEFAULT ACCOUNTS ====================
-
-@finance_bp.route('/setup/initialize', methods=['POST'])
-@login_required
-@require_finance_role
-def initialize_accounts():
-    """Initialize default chart of accounts"""
-    if AccountCategory.query.count() > 0:
-        flash('Accounts already initialized.', 'info')
-        return redirect(url_for('finance.chart_of_accounts'))
-    
-    # Create default categories
-    categories_data = [
-        {'code': '1000', 'name': 'Current Assets', 'type': 'asset'},
-        {'code': '1500', 'name': 'Fixed Assets', 'type': 'asset'},
-        {'code': '2000', 'name': 'Current Liabilities', 'type': 'liability'},
-        {'code': '2500', 'name': 'Long-term Liabilities', 'type': 'liability'},
-        {'code': '3000', 'name': 'Equity', 'type': 'equity'},
-        {'code': '4000', 'name': 'Income', 'type': 'income'},
-        {'code': '5000', 'name': 'Expenses', 'type': 'expense'},
-    ]
-    
-    for cat_data in categories_data:
-        category = AccountCategory(**cat_data)
-        db.session.add(category)
-    
-    db.session.flush()
-    
-    # Create default accounts
-    accounts_data = [
-        # Assets
-        {'code': '1001', 'name': 'Cash on Hand', 'account_type': 'asset', 'normal_balance': 'debit', 'is_system': True},
-        {'code': '1002', 'name': 'M-Pesa Account', 'account_type': 'asset', 'normal_balance': 'debit', 'is_system': True},
-        {'code': '1003', 'name': 'Bank Account', 'account_type': 'asset', 'normal_balance': 'debit'},
-        {'code': '1010', 'name': 'Accounts Receivable', 'account_type': 'asset', 'normal_balance': 'debit'},
-        {'code': '1020', 'name': 'Prepaid Expenses', 'account_type': 'asset', 'normal_balance': 'debit'},
-        
-        # Liabilities
-        {'code': '2001', 'name': 'Accounts Payable', 'account_type': 'liability', 'normal_balance': 'credit'},
-        {'code': '2010', 'name': 'Accrued Expenses', 'account_type': 'liability', 'normal_balance': 'credit'},
-        {'code': '2020', 'name': 'Deposits Received', 'account_type': 'liability', 'normal_balance': 'credit'},
-        
 # ==================== PAYMENT APPROVALS ====================
 
 @finance_bp.route('/payment-approvals')
@@ -1001,7 +959,7 @@ def approve_payment(payment_id):
         
         db.session.commit()
         
-        flash(f'Payment of KES {payment.amount:,.2f} approved successfully. {len(payment.delegates)} delegate(s) marked as paid.', 'success')
+        flash(f'Payment of KES {payment.amount:,.2f} approved successfully. {len(payment.delegates.all())} delegate(s) marked as paid.', 'success')
         
     except Exception as e:
         db.session.rollback()
@@ -1096,8 +1054,48 @@ def rejected_payments():
                          payments=payments)
 
 
-# ==================== CHART OF ACCOUNTS INITIALIZATION ====================
+# ==================== INITIALIZE DEFAULT ACCOUNTS ====================
 
+@finance_bp.route('/setup/initialize', methods=['POST'])
+@login_required
+@require_finance_role
+def initialize_accounts():
+    """Initialize default chart of accounts"""
+    if AccountCategory.query.count() > 0:
+        flash('Accounts already initialized.', 'info')
+        return redirect(url_for('finance.chart_of_accounts'))
+    
+    # Create default categories
+    categories_data = [
+        {'code': '1000', 'name': 'Current Assets', 'type': 'asset'},
+        {'code': '1500', 'name': 'Fixed Assets', 'type': 'asset'},
+        {'code': '2000', 'name': 'Current Liabilities', 'type': 'liability'},
+        {'code': '2500', 'name': 'Long-term Liabilities', 'type': 'liability'},
+        {'code': '3000', 'name': 'Equity', 'type': 'equity'},
+        {'code': '4000', 'name': 'Income', 'type': 'income'},
+        {'code': '5000', 'name': 'Expenses', 'type': 'expense'},
+    ]
+    
+    for cat_data in categories_data:
+        category = AccountCategory(**cat_data)
+        db.session.add(category)
+    
+    db.session.flush()
+    
+    # Create default accounts
+    accounts_data = [
+        # Assets
+        {'code': '1001', 'name': 'Cash on Hand', 'account_type': 'asset', 'normal_balance': 'debit', 'is_system': True},
+        {'code': '1002', 'name': 'M-Pesa Account', 'account_type': 'asset', 'normal_balance': 'debit', 'is_system': True},
+        {'code': '1003', 'name': 'Bank Account', 'account_type': 'asset', 'normal_balance': 'debit'},
+        {'code': '1010', 'name': 'Accounts Receivable', 'account_type': 'asset', 'normal_balance': 'debit'},
+        {'code': '1020', 'name': 'Prepaid Expenses', 'account_type': 'asset', 'normal_balance': 'debit'},
+        
+        # Liabilities
+        {'code': '2001', 'name': 'Accounts Payable', 'account_type': 'liability', 'normal_balance': 'credit'},
+        {'code': '2010', 'name': 'Accrued Expenses', 'account_type': 'liability', 'normal_balance': 'credit'},
+        {'code': '2020', 'name': 'Deposits Received', 'account_type': 'liability', 'normal_balance': 'credit'},
+        
         # Equity
         {'code': '3001', 'name': 'Opening Balance Equity', 'account_type': 'equity', 'normal_balance': 'credit'},
         {'code': '3010', 'name': 'Retained Earnings', 'account_type': 'equity', 'normal_balance': 'credit'},
