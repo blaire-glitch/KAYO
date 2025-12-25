@@ -98,7 +98,7 @@ def register_delegate():
             id_number=id_number or None,
             email=email or None,
             gender=gender,
-            age_bracket=age_bracket or None,
+            age_bracket=age_bracket,
             category='delegate',
             event_id=event.id if event else None,
             status='pending'

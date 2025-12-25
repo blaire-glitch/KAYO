@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SelectField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError, Optional
+from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError, Optional, InputRequired
 from app.models.user import User
 from app.church_data import get_archdeaconries, get_parishes, CHURCH_DATA
 
@@ -98,7 +98,7 @@ class DelegateForm(FlaskForm):
         ('20_24', '20-24'),
         ('25_29', '25-29'),
         ('30_above', '30 and Above')
-    ], validators=[DataRequired()])
+    ], validators=[InputRequired(message='Age bracket is required')])
     category = SelectField('Category', choices=[
         ('delegate', 'Delegate'),
         ('counsellor', 'Counsellor'),
