@@ -78,11 +78,22 @@
 
     <!-- Pending Payments Table -->
     <div class="card shadow-sm">
-        <div class="card-header bg-white">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
                 <i class="fas fa-list me-2"></i>
                 Payments Awaiting Approval
             </h5>
+            {% if pending_payments %}
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small me-2">
+                    <span id="selectedCount">0</span> of {{ pending_payments|length }} selected
+                </span>
+                <button type="button" class="btn btn-success btn-sm" id="bulkApproveBtn" disabled
+                        data-bs-toggle="modal" data-bs-target="#bulkApproveModal">
+                    <i class="fas fa-check-double me-1"></i> Approve Selected
+                </button>
+            </div>
+            {% endif %}
         </div>
         <div class="card-body p-0">
             {% if pending_payments %}
@@ -90,6 +101,9 @@
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
+                            <th style="width: 50px;">
+                                <input type="checkbox" class="form-check-input" id="selectAll" title="Select All">
+                            </th>
                             <th>Reference</th>
                             <th>Submitted By</th>
                             <th>Date</th>
@@ -102,6 +116,12 @@
                     <tbody>
                         {% for payment in pending_payments %}
                         <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input payment-checkbox" 
+                                       value="{{ payment.id }}" 
+                                       data-amount="{{ payment.amount }}"
+                                       data-delegates="{{ payment.delegates.count() }}">
+                            </td>
                             <td>
                                 <strong>{{ payment.mpesa_receipt_number or ('PAY-' ~ payment.id) }}</strong>
                             </td>
@@ -268,16 +288,136 @@
     </div>
 </div>
 {% endfor %}
+
+<!-- Bulk Approve Modal -->
+<div class="modal fade" id="bulkApproveModal" tabindex="-1" aria-labelledby="bulkApproveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="bulkApproveModalLabel">
+                    <i class="fas fa-check-double me-2"></i>
+                    Bulk Approve Payments
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('finance.bulk_approve_payments') }}" method="POST" id="bulkApproveForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="payment_ids" id="bulkPaymentIds">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Confirm you have received the cash from all selected chairs!</strong>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>Selected Payments:</strong> <span id="bulkPaymentCount">0</span><br>
+                        <strong>Total Amount:</strong> KES <span id="bulkTotalAmount">0</span><br>
+                        <strong>Total Delegates:</strong> <span id="bulkDelegateCount">0</span>
+                    </div>
+                    <p>Approving these payments will:</p>
+                    <ul>
+                        <li>Mark all associated delegates as <strong>PAID</strong></li>
+                        <li><strong>Issue tickets</strong> to all delegates</li>
+                        <li>Complete all payment transactions</li>
+                    </ul>
+                    <div class="mb-3">
+                        <label class="form-label" for="bulkApproveNotes">Notes (optional)</label>
+                        <textarea name="notes" id="bulkApproveNotes" class="form-control" rows="2" 
+                                  placeholder="e.g., Cash received in full for all payments"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="bulkApproveSubmit">
+                        <i class="fas fa-check-double me-1"></i> Confirm & Approve All
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Handle form submission with loading state
 document.addEventListener('DOMContentLoaded', function() {
-    // Get all approve and reject forms
-    const forms = document.querySelectorAll('form[action*="/approve"], form[action*="/reject"]');
+    // Select All functionality
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const paymentCheckboxes = document.querySelectorAll('.payment-checkbox');
+    const selectedCountEl = document.getElementById('selectedCount');
+    const bulkApproveBtn = document.getElementById('bulkApproveBtn');
+    const bulkPaymentIds = document.getElementById('bulkPaymentIds');
+    const bulkPaymentCount = document.getElementById('bulkPaymentCount');
+    const bulkTotalAmount = document.getElementById('bulkTotalAmount');
+    const bulkDelegateCount = document.getElementById('bulkDelegateCount');
     
+    function updateSelection() {
+        const checked = document.querySelectorAll('.payment-checkbox:checked');
+        const count = checked.length;
+        let totalAmount = 0;
+        let totalDelegates = 0;
+        const ids = [];
+        
+        checked.forEach(cb => {
+            ids.push(cb.value);
+            totalAmount += parseFloat(cb.dataset.amount) || 0;
+            totalDelegates += parseInt(cb.dataset.delegates) || 0;
+        });
+        
+        // Update UI
+        if (selectedCountEl) selectedCountEl.textContent = count;
+        if (bulkApproveBtn) bulkApproveBtn.disabled = count === 0;
+        
+        // Update modal info
+        if (bulkPaymentIds) bulkPaymentIds.value = ids.join(',');
+        if (bulkPaymentCount) bulkPaymentCount.textContent = count;
+        if (bulkTotalAmount) bulkTotalAmount.textContent = totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (bulkDelegateCount) bulkDelegateCount.textContent = totalDelegates;
+        
+        // Update select all checkbox state
+        if (selectAllCheckbox) {
+            if (count === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (count === paymentCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+    }
+    
+    // Select All checkbox handler
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            paymentCheckboxes.forEach(cb => {
+                cb.checked = this.checked;
+            });
+            updateSelection();
+        });
+    }
+    
+    // Individual checkbox handlers
+    paymentCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelection);
+    });
+    
+    // Handle bulk approve form submission
+    const bulkApproveForm = document.getElementById('bulkApproveForm');
+    if (bulkApproveForm) {
+        bulkApproveForm.addEventListener('submit', function(e) {
+            const submitBtn = document.getElementById('bulkApproveSubmit');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing...';
+            }
+        });
+    }
+    
+    // Handle individual form submissions with loading state
+    const forms = document.querySelectorAll('form[action*="/approve"], form[action*="/reject"]');
     forms.forEach(function(form) {
         form.addEventListener('submit', function(e) {
             const submitBtn = form.querySelector('button[type="submit"]');
@@ -285,9 +425,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing...';
             }
-            // Allow form to submit normally - the redirect will refresh the page
         });
     });
+    
+    // Initialize on page load
+    updateSelection();
 });
 </script>
 {% endblock %}

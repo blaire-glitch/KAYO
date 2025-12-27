@@ -977,6 +977,88 @@ def approve_payment(payment_id):
     return redirect(url_for('finance.payment_approvals'))
 
 
+@finance_bp.route('/payments/bulk-approve', methods=['POST'])
+@login_required
+@require_finance_role
+def bulk_approve_payments():
+    """Bulk approve multiple payments submitted by chairs"""
+    payment_ids_str = request.form.get('payment_ids', '')
+    notes = request.form.get('notes', '')
+    
+    if not payment_ids_str:
+        flash('No payments selected for approval.', 'warning')
+        return redirect(url_for('finance.payment_approvals'))
+    
+    try:
+        payment_ids = [int(pid.strip()) for pid in payment_ids_str.split(',') if pid.strip()]
+    except ValueError:
+        flash('Invalid payment IDs provided.', 'danger')
+        return redirect(url_for('finance.payment_approvals'))
+    
+    if not payment_ids:
+        flash('No valid payments selected for approval.', 'warning')
+        return redirect(url_for('finance.payment_approvals'))
+    
+    approved_count = 0
+    total_amount = 0
+    total_delegates = 0
+    tickets_issued = 0
+    errors = []
+    
+    try:
+        for payment_id in payment_ids:
+            payment = Payment.query.get(payment_id)
+            if not payment:
+                errors.append(f'Payment {payment_id} not found')
+                continue
+                
+            if payment.finance_status != 'pending_approval':
+                errors.append(f'Payment {payment_id} is not pending approval')
+                continue
+            
+            try:
+                # Approve the payment
+                payment.approve_by_finance(current_user.id, notes)
+                
+                # Mark all associated delegates as paid and issue tickets
+                for delegate in payment.delegates:
+                    delegate.is_paid = True
+                    delegate.payment_confirmed_by = current_user.id
+                    delegate.payment_confirmed_at = datetime.utcnow()
+                    if not delegate.ticket_number or delegate.ticket_number.startswith('PENDING-'):
+                        from app.models.event import Event
+                        event = Event.query.get(delegate.event_id) if delegate.event_id else None
+                        delegate.ticket_number = Delegate.generate_ticket_number(event)
+                        tickets_issued += 1
+                    total_delegates += 1
+                
+                approved_count += 1
+                total_amount += payment.amount
+                
+            except Exception as e:
+                errors.append(f'Error approving payment {payment_id}: {str(e)}')
+                continue
+        
+        db.session.commit()
+        
+        if approved_count > 0:
+            flash(f'Successfully approved {approved_count} payment(s) totaling KES {total_amount:,.2f}. '
+                  f'{total_delegates} delegate(s) marked as paid. {tickets_issued} ticket(s) issued.', 'success')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'warning')
+                
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error in bulk approve: {str(e)}')
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        flash(f'Error processing bulk approval: {str(e)}', 'danger')
+    
+    return redirect(url_for('finance.payment_approvals'))
+
+
 @finance_bp.route('/payment/<int:payment_id>/reject', methods=['POST'])
 @login_required
 @require_finance_role
