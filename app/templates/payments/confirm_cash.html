@@ -2,6 +2,30 @@
 
 {% block title %}Confirm Cash Payments - KAYO{% endblock %}
 
+{% block extra_css %}
+<style>
+    .mpesa-number {
+        transition: all 0.3s ease;
+        display: inline-block;
+    }
+    .mpesa-number:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+        background-color: #ffc107 !important;
+    }
+    .copy-feedback {
+        animation: fadeInOut 1.5s ease;
+        z-index: 100;
+    }
+    @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateX(-50%) translateY(5px); }
+        20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="mb-4 mt-3">
     <nav aria-label="breadcrumb">
@@ -14,6 +38,36 @@
     <h2><i class="bi bi-cash me-2"></i>Confirm Cash Receipts from Delegates</h2>
     {% if current_user.role == 'chair' %}
     <p class="text-muted">Select delegates who have paid you cash. After confirmation, this will be submitted to Finance for final approval.</p>
+    
+    <!-- Finance M-Pesa Payment Info -->
+    <div class="alert alert-success shadow-sm mb-3" style="border-left: 5px solid #198754; background: linear-gradient(135deg, #d1e7dd 0%, #f8f9fa 100%);">
+        <div class="d-flex align-items-center">
+            <div class="me-3">
+                <i class="bi bi-phone-fill text-success" style="font-size: 1.8rem;"></i>
+            </div>
+            <div>
+                <h6 class="alert-heading mb-1">
+                    <i class="bi bi-send me-1"></i>Send Collected Cash via M-Pesa to Finance
+                </h6>
+                <p class="mb-0">
+                    M-Pesa Number: 
+                    <span class="d-inline-block position-relative">
+                        <strong class="mpesa-number text-dark bg-warning px-2 py-1 rounded" 
+                                onclick="copyMpesaNumber(this)" 
+                                style="font-size: 1.1rem; letter-spacing: 1px; cursor: pointer;"
+                                title="Click to copy">
+                            0742080328
+                        </strong>
+                        <span class="copy-feedback position-absolute bg-dark text-white px-2 py-1 rounded small" 
+                              style="display: none; top: -30px; left: 50%; transform: translateX(-50%); white-space: nowrap;">
+                            Copied!
+                        </span>
+                    </span>
+                    <small class="text-muted ms-2">(Tap to copy)</small>
+                </p>
+            </div>
+        </div>
+    </div>
     
     <!-- Workflow Steps -->
     <div class="alert alert-info">
@@ -306,5 +360,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// M-Pesa number copy function
+function copyMpesaNumber(element) {
+    const number = element.textContent.trim();
+    navigator.clipboard.writeText(number).then(function() {
+        // Show feedback
+        const feedback = element.parentElement.querySelector('.copy-feedback');
+        if (feedback) {
+            feedback.style.display = 'block';
+            setTimeout(function() {
+                feedback.style.display = 'none';
+            }, 1500);
+        }
+        
+        // Brief visual feedback
+        element.style.backgroundColor = '#198754';
+        element.style.color = 'white';
+        setTimeout(function() {
+            element.style.backgroundColor = '';
+            element.style.color = '';
+        }, 300);
+    }).catch(function(err) {
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = number;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('M-Pesa number copied: ' + number);
+    });
+}
 </script>
 {% endblock %}
