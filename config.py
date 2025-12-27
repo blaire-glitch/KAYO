@@ -1,12 +1,26 @@
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Determine base directory for PyInstaller compatibility
+if getattr(sys, 'frozen', False):
+    # Running as compiled exe - use exe's directory for database
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # Running as script
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Database path - always in instance folder next to exe/script
+INSTANCE_PATH = os.path.join(BASE_DIR, 'instance')
+DB_PATH = os.path.join(INSTANCE_PATH, 'kayo.db')
+
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-change-in-production'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///kayo.db'
+    # Use absolute path for database to work with PyInstaller
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{DB_PATH}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Session Configuration for proper CSRF handling
