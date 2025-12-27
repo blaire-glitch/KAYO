@@ -4,6 +4,9 @@ Launches the KAYO Flask app in a native desktop window.
 """
 import sys
 import os
+import webbrowser
+import threading
+import time
 
 # Handle PyInstaller bundled environment
 if getattr(sys, 'frozen', False):
@@ -21,10 +24,14 @@ sys.path.insert(0, BASE_DIR)
 # Set environment variable for Flask to find templates
 os.environ['FLASK_APP_BASE'] = BASE_DIR
 
-from flaskwebgui import FlaskUI
 from app import create_app, db
 from app.models import User
 from werkzeug.security import generate_password_hash
+
+def open_browser(port):
+    """Open browser after a short delay."""
+    time.sleep(1.5)
+    webbrowser.open(f'http://127.0.0.1:{port}')
 
 def main():
     """Launch KAYO as a desktop application."""
@@ -57,19 +64,20 @@ def main():
             db.session.commit()
             print("Default admin created: admin@kayo.com / admin123")
     
-    # Configure FlaskUI
-    # Uses Chrome/Edge in app mode for native-like experience
-    ui = FlaskUI(
-        app=app,
-        server="flask",
-        width=1400,
-        height=900,
-        fullscreen=False,
-        browser_path=None,  # Auto-detect Chrome/Edge
-    )
+    port = 5000
+    print(f"\n{'='*50}")
+    print("KAYO Desktop Application")
+    print(f"{'='*50}")
+    print(f"Server starting on http://127.0.0.1:{port}")
+    print("Opening in your default browser...")
+    print("Press Ctrl+C to stop the server")
+    print(f"{'='*50}\n")
     
-    # Run the desktop app
-    ui.run()
+    # Open browser in background thread
+    threading.Thread(target=open_browser, args=(port,), daemon=True).start()
+    
+    # Run Flask server
+    app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":

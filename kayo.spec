@@ -48,7 +48,7 @@ a = Analysis(
         'jwt',
         'dateutil',
         'psutil',
-        'flaskwebgui',
+        'webbrowser',
         # App modules
         'app',
         'app.models',
@@ -72,10 +72,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='KAYO',
     debug=False,
     bootloader_ignore_signals=False,
@@ -90,4 +88,16 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='app/static/images/logo.ico' if os.path.exists('app/static/images/logo.ico') else None,
+)
+
+# Create folder distribution (more reliable across machines)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='KAYO',
 )
