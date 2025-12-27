@@ -36,6 +36,25 @@
         
         <div class="row">
             <div class="col-lg-8">
+                <!-- Global Select All Controls -->
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <button type="button" class="btn btn-primary btn-sm" id="globalSelectAll">
+                                    <i class="bi bi-check-all me-1"></i>Select All Delegates
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="globalDeselectAll">
+                                    <i class="bi bi-x me-1"></i>Deselect All
+                                </button>
+                            </div>
+                            <span class="text-muted small">
+                                <span id="globalSelectedCount">0</span> of <span id="globalTotalCount">0</span> selected
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Delegates by Chair -->
                 <div class="accordion" id="chairsAccordion">
                     {% for chair, delegates in unpaid_by_chair.items() %}
@@ -159,6 +178,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedCountEl = document.getElementById('selectedCount');
     const totalAmountEl = document.getElementById('totalAmount');
     const submitBtn = document.getElementById('submitBtn');
+    const globalSelectedCount = document.getElementById('globalSelectedCount');
+    const globalTotalCount = document.getElementById('globalTotalCount');
+    const globalSelectAllBtn = document.getElementById('globalSelectAll');
+    const globalDeselectAllBtn = document.getElementById('globalDeselectAll');
+    
+    // Set total count
+    if (globalTotalCount) {
+        globalTotalCount.textContent = checkboxes.length;
+    }
 
     function updateSummary() {
         const checked = document.querySelectorAll('.delegate-checkbox:checked');
@@ -172,14 +200,57 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedCountEl.textContent = count;
         totalAmountEl.textContent = 'KSh ' + total.toLocaleString();
         submitBtn.disabled = count === 0;
+        
+        // Update global count
+        if (globalSelectedCount) {
+            globalSelectedCount.textContent = count;
+        }
+        
+        // Update chair-level checkboxes state
+        document.querySelectorAll('.chair-select-all').forEach(chairCb => {
+            const chairId = chairCb.dataset.chair;
+            const chairCheckboxes = document.querySelectorAll(`.delegate-checkbox[data-chair="${chairId}"]`);
+            const chairChecked = document.querySelectorAll(`.delegate-checkbox[data-chair="${chairId}"]:checked`);
+            
+            if (chairChecked.length === 0) {
+                chairCb.checked = false;
+                chairCb.indeterminate = false;
+            } else if (chairChecked.length === chairCheckboxes.length) {
+                chairCb.checked = true;
+                chairCb.indeterminate = false;
+            } else {
+                chairCb.checked = false;
+                chairCb.indeterminate = true;
+            }
+        });
     }
 
     // Individual checkbox change
     checkboxes.forEach(cb => {
         cb.addEventListener('change', updateSummary);
     });
+    
+    // Global Select All button
+    if (globalSelectAllBtn) {
+        globalSelectAllBtn.addEventListener('click', function() {
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+            });
+            updateSummary();
+        });
+    }
+    
+    // Global Deselect All button
+    if (globalDeselectAllBtn) {
+        globalDeselectAllBtn.addEventListener('click', function() {
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+            });
+            updateSummary();
+        });
+    }
 
-    // Select All buttons
+    // Select All buttons (per chair)
     document.querySelectorAll('.select-all-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const chairId = this.dataset.chair;
@@ -190,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Deselect All buttons
+    // Deselect All buttons (per chair)
     document.querySelectorAll('.deselect-all-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const chairId = this.dataset.chair;
@@ -205,12 +276,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.chair-select-all').forEach(cb => {
         cb.addEventListener('change', function() {
             const chairId = this.dataset.chair;
+            const isChecked = this.checked;
             document.querySelectorAll(`.delegate-checkbox[data-chair="${chairId}"]`).forEach(checkbox => {
-                checkbox.checked = this.checked;
+                checkbox.checked = isChecked;
             });
             updateSummary();
         });
     });
+    
+    // Initialize counts on page load
+    updateSummary();
 });
 </script>
 {% endblock %}
