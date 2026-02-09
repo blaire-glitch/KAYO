@@ -103,8 +103,7 @@ KAYO/
 
 ## Default Admin Login
 
-- **Email:** admin@kayo.org
-- **Password:** admin123
+- contact for deatils
 
 ⚠️ **Change the admin password immediately after first login!**
 
