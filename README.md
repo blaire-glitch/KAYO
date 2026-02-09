@@ -4,12 +4,12 @@ A Flask web application for managing youth delegate registrations with M-Pesa pa
 
 ## Features
 
-- 🔐 **Authentication System** - Login for Chairs, Finance, and Admins
-- 👥 **Delegate Registration** - Register delegates with church details
-- 💳 **M-Pesa Integration** - Daraja API for seamless payments via STK Push
-- 📊 **Admin Dashboard** - Overview with statistics, reports, and exports
-- 📄 **Export Reports** - Excel and PDF export functionality
-- 📱 **Responsive Design** - Bootstrap 5 for mobile-friendly interface
+-    **Authentication System** - Login for Chairs, Finance, and Admins
+-    **Delegate Registration** - Register delegates with church details
+-    **M-Pesa Integration** - Daraja API for seamless payments via STK Push
+-    **Admin Dashboard** - Overview with statistics, reports, and exports
+-    **Export Reports** - Excel and PDF export functionality
+     **Responsive Design** - Bootstrap 5 for mobile-friendly interface
 
 ## Tech Stack
 
@@ -194,4 +194,4 @@ This project is licensed under the MIT License.
 
 ## Support
 
-For support, email support@kayo.org or create an issue on GitHub.
+For support, email monsieuraloo@gmail.com or create an issue on GitHub.
